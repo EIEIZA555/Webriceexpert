@@ -41,21 +41,23 @@ export function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-slate-50/80 flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-border hidden lg:flex flex-col">
-        <div className="p-6 border-b border-border">
+      <aside className="w-64 bg-white border-r border-slate-100 shadow-sm hidden lg:flex flex-col">
+        <div className="p-6 border-b border-slate-100">
           <button
             onClick={() => navigate("/dashboard")}
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            className="flex items-center gap-3 hover:opacity-90 transition-opacity group"
           >
-            <Leaf className="w-8 h-8 text-primary" />
-            <h1 className="text-xl">Rice Expert</h1>
+            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+              <Leaf className="w-6 h-6 text-white" />
+            </div>
+            <h1 className="text-lg font-semibold text-foreground tracking-tight">Rice Expert</h1>
           </button>
         </div>
 
-        <nav className="flex-1 p-4">
-          <ul className="space-y-2">
+        <nav className="flex-1 p-4 space-y-1">
+          <ul className="space-y-1">
             {navItems
               .filter((item) => !item.adminOnly || isAdmin())
               .map(({ path, label, icon: Icon }) => {
@@ -64,8 +66,10 @@ export function AppLayout() {
                 <li key={path}>
                   <button
                     onClick={() => navigate(path)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                      isActive ? "bg-primary text-white" : "text-foreground hover:bg-accent"
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                      isActive
+                        ? "bg-emerald-600 text-white shadow-sm"
+                        : "text-slate-700 hover:bg-slate-100"
                     }`}
                   >
                     <Icon className="w-5 h-5 shrink-0" />
@@ -77,17 +81,17 @@ export function AppLayout() {
           </ul>
         </nav>
 
-        <div className="p-4 border-t border-border space-y-2">
+        <div className="p-4 border-t border-slate-100 space-y-2">
           <Button
             onClick={handleCreatePlan}
-            className="w-full justify-start rounded-lg bg-primary hover:bg-primary/90"
+            className="w-full justify-start rounded-xl h-11 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-medium"
           >
             <Plus className="w-5 h-5 mr-3" />
             สร้างแผนใหม่
           </Button>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-accent transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors text-sm font-medium"
           >
             <LogOut className="w-5 h-5" />
             <span>ออกจากระบบ</span>
@@ -96,7 +100,7 @@ export function AppLayout() {
       </aside>
 
       {/* Mobile Header */}
-      <div className="lg:hidden sticky top-0 z-40 bg-white border-b border-border flex items-center justify-between px-4 py-3">
+      <div className="lg:hidden sticky top-0 z-40 bg-white border-b border-slate-100 shadow-sm flex items-center justify-between px-4 py-3">
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className="p-2 rounded-lg hover:bg-accent"
@@ -146,8 +150,8 @@ export function AppLayout() {
                       navigate(path);
                       setMobileMenuOpen(false);
                     }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                      isActive ? "bg-primary text-white" : "text-foreground hover:bg-accent"
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                      isActive ? "bg-emerald-600 text-white" : "text-slate-700 hover:bg-slate-100"
                     }`}
                   >
                     <Icon className="w-5 h-5 shrink-0" />
@@ -164,7 +168,7 @@ export function AppLayout() {
               navigate("/create-plan");
               setMobileMenuOpen(false);
             }}
-            className="w-full justify-start rounded-lg bg-primary hover:bg-primary/90"
+            className="w-full justify-start rounded-xl h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
           >
             <Plus className="w-5 h-5 mr-3" />
             สร้างแผนใหม่
@@ -174,7 +178,7 @@ export function AppLayout() {
               handleLogout();
               setMobileMenuOpen(false);
             }}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-accent"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-100 text-sm font-medium"
           >
             <LogOut className="w-5 h-5" />
             <span>ออกจากระบบ</span>
