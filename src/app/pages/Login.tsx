@@ -1,21 +1,44 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Leaf } from "lucide-react";
+import { Leaf, LogIn, Eye, EyeOff } from "lucide-react";
+import { setAuth, isAuthenticated, validateCredentials } from "../lib/auth";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [navigate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock login - navigate to dashboard
-    navigate("/dashboard");
+    setError("");
+    setLoading(true);
+
+    setTimeout(() => {
+      const result = validateCredentials(username, password);
+      if (result.ok) {
+        setAuth(username, result.role);
+        navigate("/dashboard", { replace: true });
+      } else {
+        setError("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (user: farmer/1234, admin: admin/admin123)");
+        setLoading(false);
+      }
+    }, 500);
   };
+
+  if (isAuthenticated()) return null;
 
   return (
     <div className="min-h-screen flex">
@@ -53,33 +76,71 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="email">อีเมล</Label>
+              <Label htmlFor="username">ชื่อผู้ใช้</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="username"
+                type="text"
+                placeholder="กรอกชื่อผู้ใช้"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  setError("");
+                }}
                 className="rounded-lg bg-input-background border-border"
+                autoComplete="username"
                 required
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="password">รหัสผ่าน</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="rounded-lg bg-input-background border-border"
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="กรอกรหัสผ่าน"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError("");
+                  }}
+                  className="rounded-lg bg-input-background border-border pr-10"
+                  autoComplete="current-password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
-            <Button type="submit" className="w-full rounded-lg h-12 bg-primary hover:bg-primary/90">
-              เข้าสู่ระบบ
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              disabled={loading || !username.trim() || !password}
+              className="w-full rounded-lg h-12 bg-primary hover:bg-primary/90 disabled:opacity-50"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  กำลังเข้าสู่ระบบ...
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <LogIn size={20} />
+                  เข้าสู่ระบบ
+                </span>
+              )}
             </Button>
           </form>
 

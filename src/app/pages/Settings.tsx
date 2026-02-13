@@ -1,0 +1,31 @@
+import { Settings as SettingsIcon } from "lucide-react";
+import { Card } from "../components/ui/card";
+
+export default function Settings() {
+  return (
+    <div className="p-4 lg:p-8">
+      <div className="mb-6">
+        <h2 className="text-2xl mb-1">ตั้งค่า</h2>
+        <p className="text-muted-foreground">จัดการบัญชีและค่าต่างๆ ของแอป</p>
+      </div>
+
+      <div className="max-w-2xl space-y-4">
+        <Card className="p-6 rounded-xl shadow-sm">
+          <h3 className="font-medium mb-2">ข้อมูลบัญชี</h3>
+          <p className="text-sm text-muted-foreground">
+            ฟีเจอร์ตั้งค่ากำลังจะมาเร็วๆ นี้ คุณสามารถจัดการโปรไฟล์และการแจ้งเตือนได้ที่นี่
+          </p>
+        </Card>
+        <Card className="p-6 rounded-xl shadow-sm">
+          <div className="flex items-center gap-3">
+            <SettingsIcon className="w-8 h-8 text-muted-foreground" />
+            <div>
+              <h3 className="font-medium">Rice Expert</h3>
+              <p className="text-sm text-muted-foreground">ระบบจัดการแปลงนาอัจฉริยะ</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
