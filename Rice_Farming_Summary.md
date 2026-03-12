@@ -55,4 +55,35 @@
 * **โรคไหม้:** แผลรูปตาบนใบ มักเกิดในสภาพความชื้นสูงและใส่ปุ๋ยไนโตรเจนมากเกินไป
 
 ---
-**Note:** ข้อมูลนี้อ้างอิงตามหลักเกษตรแม่นยำ (Precision Farming) เพื่อให้ได้ผลผลิตสูงสุดและลดต้นทุนได้จริง
+
+## 6. ภาพรวมโปรเจกต์ Rice Expert (High Level)
+
+### 6.1 เทคสแตก / โครงสร้างหลัก
+- Frontend ใช้ **React + Vite + Tailwind UI (shadcn)**, animate ด้วย `motion`, จัดการวันด้วย `date-fns`, state กลางใช้ **Zustand**
+- โค้ดหลักอยู่ใน `src/app`, แยกเป็น `pages/` (`Dashboard`, `Plots`, `CreatePlan`), `lib/` (business logic), `store/` (global state)
+
+### 6.2 ฟีเจอร์ Smart Planner (ของจริง ไม่ใช่ mock)
+- `CreatePlan.tsx` ให้เลือกพันธุ์ข้าว (`RICE_VARIETIES` จาก `planGenerator.ts`), วันปลูก, ชื่อแปลง, ขนาดพื้นที่
+- `planStore.ts` สร้าง `PlantingPlan` จาก `generatePlan()` (ได้ `tasks`, `totalDays`, `varietyName`) และมี helper: `getUpcomingTasks`, `getProgressPercent`, `getCurrentStage`, `getDaysSinceStart`
+- `Dashboard.tsx` แสดงแผนปัจจุบัน: ระยะเติบโตปัจจุบัน, progress วงกลม, smart checklist 30 วัน, summary จำนวนแปลง/พื้นที่/ใกล้เก็บเกี่ยว และการ์ดแปลงย่อ
+- `Plots.tsx` แสดงรายการแปลงทั้งหมดจาก `usePlanStore`, เลือกแปลงเพื่อ set เป็น current plan บน Dashboard
+
+### 6.3 Logic ฝั่งเกษตร (ตาม PRD)
+- `planGenerator.ts` กำหนด `RICE_VARIETIES` (เช่น jasmine, RD43, กข15, ปทุมธานี) พร้อม stages และ tasks ใช้สร้างไทม์ไลน์
+- `harvestCalculator.ts` มี `calculateHarvestDate()` แยก logic ชัดเจนระหว่าง  
+  - ข้าวดอ / นาปี / ไวแสง → ไม่ใช้อายุวัน, fix ช่วงเก็บเกี่ยว ต.ค.–พ.ย. และห้ามปลูกนอกฤดู  
+  - ข้าวเบา/กลาง/หนัก / นาปรัง / ไม่ไวแสง → คำนวณ `วันที่ปลูก + อายุข้าว`
+- ตอนนี้ยังไม่ได้ผูก `calculateHarvestDate` เข้ากับ UI โดยตรง (ใช้ได้เมื่อต้องการต่อยอดฟีเจอร์วันเก็บเกี่ยวอัตโนมัติ)
+
+### 6.4 เอกสารความรู้ / PRD (Source of Truth)
+- `RICE_EXPERT_PRD.md` – PRD ความรู้ข้าวและ lifecycle (จาก Gemini) ใช้เป็น **Source of Truth** เวลาแก้ logic
+- `PRD_RiceExpert_V2.md` – PRD เวอร์ชันที่เน้น Smart Scheduler: นิยามข้าวดอ vs ข้าวเบา, นาปี/นาปรัง, RAG requirements
+- `Rice_Farming_Summary.md` – สรุปความรู้การทำนา (ใช้ feed ให้ RAG/LLM ได้)
+
+### 6.5 อื่นๆ / Housekeeping
+- `.gitignore` ตอนนี้ ignore `dist/` แล้ว ไฟล์ build จะไม่ติด git
+- มีไฟล์ build ล่าสุดใน `dist/` สำหรับรัน dev/build แต่เราไม่ใช้เป็น source
+
+---
+**Note:** ข้อมูลนี้อ้างอิงตามหลักเกษตรแม่นยำ (Precision Farming) และสะท้อนสภาพปัจจุบันของโปรเจกต์ Rice Expert เพื่อใช้เป็น Context ให้ AI/RAG ตอบคำถามได้ตรงกับระบบจริง
+
