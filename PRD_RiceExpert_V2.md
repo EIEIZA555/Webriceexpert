@@ -42,7 +42,43 @@
 
 ---
 
-## 5. Success Metrics (ตัวชี้วัด)
+## 5. Frontend vs Backend Responsibilities
+
+เพื่อไม่ให้ Logic ซ้ำซ้อน และสอดคล้องกับ repo หลังบ้าน `rice-rag-backend` ให้แบ่งหน้าที่ชัดเจนดังนี้:
+
+### 5.1 Frontend (Webriceexpert – React/Vite)
+- แบบฟอร์ม Input และ UX ทั้งหมด:
+  - เลือกประเภทการปลูก, พันธุ์ข้าว, วันปลูก, ขนาดพื้นที่, ชื่อแปลง
+  - แสดง Timeline / Calendar / Checklist / Dashboard ตามข้อมูลแผนที่ได้รับ
+- State management ฝั่ง client:
+  - เก็บแผนที่ user เลือกอยู่ตอนนี้ (current field) ด้วย Zustand (`usePlanStore`)
+  - แสดง progress, current stage, upcoming tasks, calendar view จากข้อมูลแผน (ไม่คิด logic RAG เอง)
+- Integration:
+  - เรียก **Backend API** กลุ่ม `/plans` เพื่อ
+    - POST `/plans` → ขอให้ backend generate แผน (และบันทึกลง DB)
+    - GET `/plans` / `/plans/{id}` → ดึงแผนเก่ามาแสดงบน Dashboard / Calendar
+  - เรียก **Backend API** `/chat` เพื่อใช้ RAG ตอบคำถาม พร้อมแสดง latency / metrics ที่ backend ส่งมา
+  - **Guest vs Logged-in:**
+    - Guest (ไม่ล็อกอิน): สามารถเข้าใช้หน้า knowledge, RAG chatbot, และดู UI ส่วนใหญ่ได้ แต่การ call backend จะไม่ผูกกับ user id (chat history เป็นแบบชั่วคราว)
+    - Logged-in: ใช้ endpoint เดิม แต่ backend จะผูก chat history / plans / documents กับ user เพื่อเก็บประวัติและนำไปวิเคราะห์ในงานวิจัย
+
+> **Note:** Logic อย่าง `calculateHarvestDate` และ `RICE_VARIETIES` ใน frontend ให้ถือเป็น **UI helper / fallback** เท่านั้น ถ้า backend ส่งแผน/วันเก็บเกี่ยวมาแล้ว ต้องเชื่อค่าจาก backend เป็นหลัก
+
+### 5.2 Backend (rice-rag-backend – FastAPI)
+- RAG Pipeline (พระเอกของ thesis):
+  - `/chat` ใช้ LangChain + Ollama + ChromaDB ตอบคำถามจากเอกสาร (รวม PRD/ความรู้การทำนา) และบันทึก metrics (`response_time_ms`, `ram_used_mb`, ฯลฯ)
+  - `/documents` สำหรับอัปโหลด/จัดการ knowledge base (PDF/TXT/DOCX)
+- Plan Service:
+  - `/plans` รับ input จาก frontend (พันธุ์ข้าว, วิธีปลูก, วันปลูก, ขนาดพื้นที่ ฯลฯ)
+  - generate แผนการปลูก (plan_content JSON) และเก็บลงตาราง `planting_plans`
+  - คำนวณ/บันทึกข้อมูล metrics ที่ใช้ในงานวิจัย (เวลา, RAM, model_used) ลงใน plan
+- Auth & User Management:
+  - `/auth/register`, `/auth/login`, `/auth/me` ใช้ JWT
+  - เก็บ chat history, plans, documents ผูกกับ user
+
+---
+
+## 6. Success Metrics (ตัวชี้วัด)
 1. **Accuracy:** ระบบคำนวณวันเก็บเกี่ยวข้าวดอ และข้าวนาปีได้ตรงตาม "จังหวะตะวันอ้อมข้าว" ของพื้นที่นั้นๆ
 2. **Speed:** Latency ของระบบ RAG ต้องต่ำกว่า 2000ms สำหรับการค้นหาข้อมูลเชิงลึก
 3. **Reliability:** AI ไม่สับสนระหว่าง "ข้าวเบา" (อายุสั้น) กับ "ข้าวดอ" (ไวแสงแต่เกี่ยวเร็ว)

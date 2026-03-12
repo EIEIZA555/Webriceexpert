@@ -5,13 +5,14 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Leaf, LogIn, Eye, EyeOff } from "lucide-react";
-import { setAuth, isAuthenticated, validateCredentials } from "../lib/auth";
+import { isAuthenticated, login, register } from "../lib/auth";
 
 export default function Login() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -21,21 +22,24 @@ export default function Login() {
     }
   }, [navigate]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    setTimeout(() => {
-      const result = validateCredentials(username, password);
-      if (result.ok) {
-        setAuth(username, result.role);
-        navigate("/dashboard", { replace: true });
+    try {
+      if (isRegister) {
+        await register(username, password);
       } else {
-        setError("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (user: farmer/1234, admin: admin/admin123)");
-        setLoading(false);
+        await login(username, password);
       }
-    }, 500);
+      navigate("/dashboard", { replace: true });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "ไม่สามารถติดต่อเซิร์ฟเวอร์ได้";
+      setError(message);
+      setLoading(false);
+    }
   };
 
   if (isAuthenticated()) return null;
@@ -70,8 +74,14 @@ export default function Login() {
           </div>
 
           <div className="mb-8">
-            <h2 className="text-2xl mb-2">ยินดีต้อนรับ</h2>
-            <p className="text-muted-foreground">เข้าสู่ระบบเพื่อจัดการแปลงนาของคุณ</p>
+            <h2 className="text-2xl mb-2">
+              {isRegister ? "สมัครสมาชิก" : "ยินดีต้อนรับ"}
+            </h2>
+            <p className="text-muted-foreground">
+              {isRegister
+                ? "สร้างบัญชีเพื่อบันทึกแผนและประวัติการใช้งาน"
+                : "เข้าสู่ระบบเพื่อจัดการแปลงนาของคุณ"}
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -133,22 +143,47 @@ export default function Login() {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  กำลังเข้าสู่ระบบ...
+                  {isRegister ? "กำลังสมัครสมาชิก..." : "กำลังเข้าสู่ระบบ..."}
                 </span>
               ) : (
                 <span className="flex items-center justify-center gap-2">
                   <LogIn size={20} />
-                  เข้าสู่ระบบ
+                  {isRegister ? "สมัครสมาชิก" : "เข้าสู่ระบบ"}
                 </span>
               )}
             </Button>
           </form>
 
           <p className="text-center text-sm text-muted-foreground mt-6">
-            ยังไม่มีบัญชี?{" "}
-            <a href="#" className="text-primary hover:underline">
-              สมัครสมาชิก
-            </a>
+            {isRegister ? (
+              <>
+                มีบัญชีอยู่แล้ว?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegister(false);
+                    setError("");
+                  }}
+                  className="text-primary hover:underline"
+                >
+                  เข้าสู่ระบบ
+                </button>
+              </>
+            ) : (
+              <>
+                ยังไม่มีบัญชี?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegister(true);
+                    setError("");
+                  }}
+                  className="text-primary hover:underline"
+                >
+                  สมัครสมาชิก
+                </button>
+              </>
+            )}
           </p>
         </div>
       </div>

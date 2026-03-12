@@ -1,5 +1,3 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router";
 import { BookOpen, FileText, Upload } from "lucide-react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -13,27 +11,23 @@ const mockPdfs = [
 ];
 
 export default function Knowledge() {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!isAdmin()) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [navigate]);
-
-  if (!isAdmin()) return null;
+  const admin = isAdmin();
 
   return (
     <div className="p-4 lg:p-8">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl mb-1">คลังข้อมูล PDF</h2>
-          <p className="text-muted-foreground">จัดการเอกสารความรู้สำหรับ RAG Chatbot</p>
+          <h2 className="text-2xl mb-1">คลังข้อมูลความรู้</h2>
+          <p className="text-muted-foreground">
+            เอกสารและความรู้ที่ใช้เป็นพื้นฐานให้ RAG Chatbot ตอบคำถามเกี่ยวกับการปลูกข้าว
+          </p>
         </div>
-        <Button className="bg-primary hover:bg-primary/90 rounded-lg">
-          <Upload className="w-5 h-5 mr-2" />
-          อัพโหลด PDF
-        </Button>
+        {admin && (
+          <Button className="bg-primary hover:bg-primary/90 rounded-lg">
+            <Upload className="w-5 h-5 mr-2" />
+            อัพโหลด PDF
+          </Button>
+        )}
       </div>
 
       <Card className="p-6 rounded-xl shadow-sm mb-6">
@@ -42,7 +36,7 @@ export default function Knowledge() {
           <div>
             <h3 className="font-semibold">คลังความรู้ PDF</h3>
             <p className="text-sm text-muted-foreground">
-              เอกสารในคลังนี้จะถูกใช้เป็นแหล่งอ้างอิงสำหรับ AI ผู้ช่วยวิชาการข้าว
+              เอกสารในคลังนี้จะถูกใช้เป็นแหล่งอ้างอิงสำหรับ AI ผู้ช่วยวิชาการข้าว ทั้งสำหรับผู้ที่ล็อกอินและผู้เยี่ยมชมทั่วไป
             </p>
           </div>
         </div>
@@ -59,21 +53,29 @@ export default function Knowledge() {
               <p className="font-medium truncate">{pdf.title}</p>
               <p className="text-sm text-muted-foreground">{pdf.filename} • อัพโหลดเมื่อ {pdf.uploadedAt}</p>
             </div>
-            <div className="flex gap-2 shrink-0">
-              <Button variant="outline" size="sm" className="rounded-lg">
-                ดู
-              </Button>
-              <Button variant="outline" size="sm" className="rounded-lg text-destructive hover:text-destructive">
-                ลบ
-              </Button>
-            </div>
+            {admin && (
+              <div className="flex gap-2 shrink-0">
+                <Button variant="outline" size="sm" className="rounded-lg">
+                  ดู
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg text-destructive hover:text-destructive"
+                >
+                  ลบ
+                </Button>
+              </div>
+            )}
           </Card>
         ))}
       </div>
 
-      <p className="text-sm text-muted-foreground mt-4">
-        ฟีเจอร์อัพโหลดและจัดการ PDF จะเชื่อมกับ backend ในอนาคต
-      </p>
+      {admin && (
+        <p className="text-sm text-muted-foreground mt-4">
+          ฟีเจอร์อัพโหลดและจัดการ PDF จะเชื่อมกับ backend ในอนาคต
+        </p>
+      )}
     </div>
   );
 }

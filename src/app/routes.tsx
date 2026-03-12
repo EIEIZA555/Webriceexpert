@@ -26,11 +26,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/",
-    element: (
-      <ProtectedRoute>
-        <AppLayout />
-      </ProtectedRoute>
-    ),
+    element: <AppLayout />,
     children: [
       {
         index: true,
@@ -50,11 +46,19 @@ export const router = createBrowserRouter([
       },
       {
         path: "todos",
-        element: <Todos />,
+        element: (
+          <ProtectedRoute>
+            <Todos />
+          </ProtectedRoute>
+        ),
       },
       {
         path: "settings",
-        element: <Settings />,
+        element: (
+          <ProtectedRoute>
+            <Settings />
+          </ProtectedRoute>
+        ),
       },
       {
         path: "knowledge",
