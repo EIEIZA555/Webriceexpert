@@ -1,5 +1,5 @@
 import { useNavigate, useLocation, Outlet } from "react-router";
-import { clearAuth, isAdmin } from "../lib/auth";
+import { clearAuth, getUsername, isAdmin, getRole } from "../lib/auth";
 import {
   LayoutDashboard,
   Sprout,
@@ -78,6 +78,15 @@ export function AppLayout() {
         </nav>
 
         <div className="p-4 border-t border-border space-y-2">
+          <div className="px-2 py-2 rounded-lg bg-accent/50 flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-semibold shrink-0">
+              {getUsername()?.charAt(0).toUpperCase() ?? "?"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm truncate">{getUsername() ?? "-"}</p>
+              <p className="text-xs text-muted-foreground">{getRole() === "admin" ? "Admin" : "User"}</p>
+            </div>
+          </div>
           <Button
             onClick={handleCreatePlan}
             className="w-full justify-start rounded-lg bg-primary hover:bg-primary/90"
@@ -159,6 +168,15 @@ export function AppLayout() {
           </ul>
         </nav>
         <div className="p-4 border-t border-border space-y-2">
+          <div className="px-2 py-2 rounded-lg bg-accent/50 flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-semibold shrink-0">
+              {getUsername()?.charAt(0).toUpperCase() ?? "?"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm truncate">{getUsername() ?? "-"}</p>
+              <p className="text-xs text-muted-foreground">{getRole() === "admin" ? "Admin" : "User"}</p>
+            </div>
+          </div>
           <Button
             onClick={() => {
               navigate("/create-plan");

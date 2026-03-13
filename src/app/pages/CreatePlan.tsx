@@ -5,6 +5,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { ArrowLeft, Check, Leaf } from "lucide-react";
+import { usePlans } from "../hooks/usePlans";
 
 const riceVarieties = [
   { id: "jasmine", name: "ข้าวหอมมะลิ", description: "เหมาะสำหรับฤดูฝน" },
@@ -15,6 +16,7 @@ const riceVarieties = [
 
 export default function CreatePlan() {
   const navigate = useNavigate();
+  const { createPlan } = usePlans();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     variety: "",
@@ -22,34 +24,43 @@ export default function CreatePlan() {
     landSize: "",
     plotName: "",
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleBack = () => {
-    if (step === 1) {
-      navigate("/dashboard");
-    } else {
-      setStep(step - 1);
-    }
+    if (step === 1) navigate("/dashboard");
+    else setStep(step - 1);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step < 3) {
       setStep(step + 1);
-    } else {
-      // Submit form and navigate back to dashboard
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      await createPlan({
+        varietyId: formData.variety,
+        startDate: formData.plantDate,
+        plotName: formData.plotName,
+        landSize: formData.landSize,
+      });
       navigate("/dashboard");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const isStepValid = () => {
     switch (step) {
-      case 1:
-        return formData.variety !== "";
-      case 2:
-        return formData.plantDate !== "";
-      case 3:
-        return formData.landSize !== "" && formData.plotName !== "";
-      default:
-        return false;
+      case 1: return formData.variety !== "";
+      case 2: return formData.plantDate !== "";
+      case 3: return formData.landSize !== "" && formData.plotName !== "";
+      default: return false;
     }
   };
 
@@ -59,12 +70,7 @@ export default function CreatePlan() {
       <div className="bg-white border-b border-border">
         <div className="max-w-4xl mx-auto px-4 lg:px-8 py-4">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleBack}
-              className="rounded-lg"
-            >
+            <Button variant="ghost" size="sm" onClick={handleBack} className="rounded-lg">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div className="flex items-center gap-2">
@@ -82,25 +88,11 @@ export default function CreatePlan() {
             {[1, 2, 3].map((stepNumber) => (
               <div key={stepNumber} className="flex items-center flex-1">
                 <div className="flex items-center">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                      step >= stepNumber
-                        ? "bg-primary text-white"
-                        : "bg-gray-200 text-gray-500"
-                    }`}
-                  >
-                    {step > stepNumber ? (
-                      <Check className="w-5 h-5" />
-                    ) : (
-                      <span>{stepNumber}</span>
-                    )}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${step >= stepNumber ? "bg-primary text-white" : "bg-gray-200 text-gray-500"}`}>
+                    {step > stepNumber ? <Check className="w-5 h-5" /> : <span>{stepNumber}</span>}
                   </div>
                   <div className="ml-3 hidden sm:block">
-                    <p
-                      className={`text-sm ${
-                        step >= stepNumber ? "text-foreground" : "text-muted-foreground"
-                      }`}
-                    >
+                    <p className={`text-sm ${step >= stepNumber ? "text-foreground" : "text-muted-foreground"}`}>
                       {stepNumber === 1 && "เลือกพันธุ์ข้าว"}
                       {stepNumber === 2 && "กำหนดวันปลูก"}
                       {stepNumber === 3 && "รายละเอียดแปลง"}
@@ -109,12 +101,7 @@ export default function CreatePlan() {
                 </div>
                 {stepNumber < 3 && (
                   <div className="flex-1 h-0.5 mx-4 bg-gray-200">
-                    <div
-                      className={`h-full transition-all ${
-                        step > stepNumber ? "bg-primary" : "bg-gray-200"
-                      }`}
-                      style={{ width: step > stepNumber ? "100%" : "0%" }}
-                    />
+                    <div className={`h-full transition-all ${step > stepNumber ? "bg-primary" : "bg-gray-200"}`} style={{ width: step > stepNumber ? "100%" : "0%" }} />
                   </div>
                 )}
               </div>
@@ -126,24 +113,16 @@ export default function CreatePlan() {
       {/* Form Content */}
       <div className="max-w-4xl mx-auto px-4 lg:px-8 py-8">
         <Card className="p-8 rounded-xl shadow-sm">
-          {/* Step 1: Select Rice Variety */}
           {step === 1 && (
             <div>
               <h2 className="text-2xl mb-2">เลือกพันธุ์ข้าว</h2>
-              <p className="text-muted-foreground mb-6">
-                เลือกพันธุ์ข้าวที่เหมาะสมกับพื้นที่และฤดูกาลของคุณ
-              </p>
-
+              <p className="text-muted-foreground mb-6">เลือกพันธุ์ข้าวที่เหมาะสมกับพื้นที่และฤดูกาลของคุณ</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {riceVarieties.map((variety) => (
                   <button
                     key={variety.id}
                     onClick={() => setFormData({ ...formData, variety: variety.id })}
-                    className={`p-6 rounded-xl border-2 text-left transition-all hover:border-primary/50 ${
-                      formData.variety === variety.id
-                        ? "border-primary bg-primary/5"
-                        : "border-border"
-                    }`}
+                    className={`p-6 rounded-xl border-2 text-left transition-all hover:border-primary/50 ${formData.variety === variety.id ? "border-primary bg-primary/5" : "border-border"}`}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <h3 className="text-lg">{variety.name}</h3>
@@ -160,83 +139,59 @@ export default function CreatePlan() {
             </div>
           )}
 
-          {/* Step 2: Select Planting Date */}
           {step === 2 && (
             <div>
               <h2 className="text-2xl mb-2">กำหนดวันเริ่มปลูก</h2>
-              <p className="text-muted-foreground mb-6">
-                เลือกวันที่คุณวางแผนจะเริ่มปลูกข้าว
-              </p>
-
+              <p className="text-muted-foreground mb-6">เลือกวันที่คุณวางแผนจะเริ่มปลูกข้าว</p>
               <div className="max-w-md">
-                <Label htmlFor="plantDate" className="mb-2 block">
-                  วันที่เริ่มปลูก
-                </Label>
+                <Label htmlFor="plantDate" className="mb-2 block">วันที่เริ่มปลูก</Label>
                 <Input
                   id="plantDate"
                   type="date"
                   value={formData.plantDate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, plantDate: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, plantDate: e.target.value })}
                   className="rounded-lg bg-input-background border-border h-12"
                 />
-                <p className="text-sm text-muted-foreground mt-2">
-                  ระบบจะคำนวณแผนการดูแลตามวันที่คุณเลือก
-                </p>
+                <p className="text-sm text-muted-foreground mt-2">ระบบจะคำนวณแผนการดูแลตามวันที่คุณเลือก</p>
               </div>
             </div>
           )}
 
-          {/* Step 3: Land Details */}
           {step === 3 && (
             <div>
               <h2 className="text-2xl mb-2">รายละเอียดแปลงนา</h2>
-              <p className="text-muted-foreground mb-6">
-                กรอกข้อมูลเกี่ยวกับแปลงนาของคุณ
-              </p>
-
+              <p className="text-muted-foreground mb-6">กรอกข้อมูลเกี่ยวกับแปลงนาของคุณ</p>
               <div className="max-w-md space-y-6">
                 <div>
-                  <Label htmlFor="plotName" className="mb-2 block">
-                    ชื่อแปลงนา
-                  </Label>
+                  <Label htmlFor="plotName" className="mb-2 block">ชื่อแปลงนา</Label>
                   <Input
                     id="plotName"
                     type="text"
                     placeholder="เช่น แปลงนา A1"
                     value={formData.plotName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, plotName: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, plotName: e.target.value })}
                     className="rounded-lg bg-input-background border-border h-12"
                   />
                 </div>
-
                 <div>
-                  <Label htmlFor="landSize" className="mb-2 block">
-                    ขนาดพื้นที่ (ไร่)
-                  </Label>
+                  <Label htmlFor="landSize" className="mb-2 block">ขนาดพื้นที่ (ไร่)</Label>
                   <Input
                     id="landSize"
                     type="number"
                     step="0.1"
                     placeholder="เช่น 3.5"
                     value={formData.landSize}
-                    onChange={(e) =>
-                      setFormData({ ...formData, landSize: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, landSize: e.target.value })}
                     className="rounded-lg bg-input-background border-border h-12"
                   />
                 </div>
 
+                {error && <p className="text-sm text-red-600">{error}</p>}
+
                 <div className="bg-accent/50 p-4 rounded-lg">
                   <h4 className="text-sm mb-2">สรุปแผนของคุณ</h4>
                   <div className="text-sm space-y-1 text-muted-foreground">
-                    <p>
-                      • พันธุ์ข้าว:{" "}
-                      {riceVarieties.find((v) => v.id === formData.variety)?.name}
-                    </p>
+                    <p>• พันธุ์ข้าว: {riceVarieties.find((v) => v.id === formData.variety)?.name}</p>
                     <p>• วันที่ปลูก: {formData.plantDate}</p>
                     <p>• ชื่อแปลง: {formData.plotName || "-"}</p>
                     <p>• ขนาดพื้นที่: {formData.landSize || "-"} ไร่</p>
@@ -246,21 +201,16 @@ export default function CreatePlan() {
             </div>
           )}
 
-          {/* Navigation Buttons */}
           <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-border">
-            <Button
-              variant="outline"
-              onClick={handleBack}
-              className="rounded-lg"
-            >
+            <Button variant="outline" onClick={handleBack} className="rounded-lg" disabled={isLoading}>
               {step === 1 ? "ยกเลิก" : "ย้อนกลับ"}
             </Button>
             <Button
               onClick={handleNext}
-              disabled={!isStepValid()}
+              disabled={!isStepValid() || isLoading}
               className="bg-primary hover:bg-primary/90 rounded-lg min-w-[120px]"
             >
-              {step === 3 ? "สร้างแผน" : "ถัดไป"}
+              {isLoading ? "กำลังสร้าง..." : step === 3 ? "สร้างแผน" : "ถัดไป"}
             </Button>
           </div>
         </Card>

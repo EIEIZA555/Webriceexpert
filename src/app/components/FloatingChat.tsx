@@ -1,26 +1,44 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Sprout } from "lucide-react";
+import { apiFetch } from "../lib/api";
+import { isAuthenticated } from "../lib/auth";
 
 const formatTime = (date: Date) =>
   date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
 
+const WELCOME_MESSAGE = {
+  id: 0,
+  text: "สวัสดีครับ! ผมเป็น AI ผู้ช่วยวิชาการข้าว ยินดีให้คำปรึกษาเกี่ยวกับการปลูกข้าว โรคข้าว และการจัดการแปลงนาครับ 🌾",
+  sender: "bot" as const,
+  timestamp: new Date(),
+};
+
+interface ChatMessage {
+  id: number;
+  text: string;
+  sender: "user" | "bot";
+  timestamp: Date;
+  sources?: string[];
+}
+
+interface ChatResponse {
+  answer: string;
+  sources: string[];
+}
+
+interface HistoryItem {
+  id: string;
+  question: string;
+  answer: string;
+  created_at: string;
+}
+
 export function FloatingChat() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Array<{
-    id: number;
-    text: string;
-    sender: "user" | "bot";
-    timestamp: Date;
-    sources?: Array<{ title: string; page?: number; filename?: string }>;
-  }>>([
-    {
-      id: 1,
-      text: "สวัสดีครับ! ผมเป็น AI ผู้ช่วยวิชาการข้าว ยินดีให้คำปรึกษาเกี่ยวกับการปลูกข้าว โรคข้าว และการจัดการแปลงนาครับ 🌾",
-      sender: "bot",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [inputMessage, setInputMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -31,31 +49,57 @@ export function FloatingChat() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = () => {
-    if (!inputMessage.trim()) return;
+  useEffect(() => {
+    if (!isOpen || historyLoaded || !isAuthenticated()) return;
+    setHistoryLoaded(true);
+    apiFetch<HistoryItem[]>("/chat/history", {}, true).then((history) => {
+      if (history.length === 0) return;
+      const loaded: ChatMessage[] = [WELCOME_MESSAGE];
+      history.forEach((h, i) => {
+        loaded.push({ id: i * 2 + 1, text: h.question, sender: "user", timestamp: new Date(h.created_at) });
+        loaded.push({ id: i * 2 + 2, text: h.answer, sender: "bot", timestamp: new Date(h.created_at) });
+      });
+      setMessages(loaded);
+    }).catch(() => {});
+  }, [isOpen, historyLoaded]);
 
+  const handleSend = async () => {
+    if (!inputMessage.trim() || isLoading) return;
+
+    const question = inputMessage;
     const userMessage = {
       id: messages.length + 1,
-      text: inputMessage,
+      text: question,
       sender: "user" as const,
       timestamp: new Date(),
     };
     setMessages((prev) => [...prev, userMessage]);
     setInputMessage("");
+    setIsLoading(true);
 
-    // Mock bot response - จะเชื่อม RAG API ในอนาคต
-    setTimeout(() => {
-      const botResponse = {
-        id: messages.length + 2,
-        text: "ขอบคุณสำหรับคำถามครับ ระบบกำลังประมวลผลข้อมูลจากคลังความรู้... (RAG API จะเชื่อมต่อที่นี่)",
+    try {
+      const data = await apiFetch<ChatResponse>("/chat/", {
+        method: "POST",
+        body: JSON.stringify({ question }),
+      }, true);
+
+      setMessages((prev) => [...prev, {
+        id: prev.length + 1,
+        text: data.answer,
         sender: "bot" as const,
         timestamp: new Date(),
-        sources: [
-          { title: "คู่มือการปลูกข้าว กรมการข้าว", page: 15, filename: "rice-guide-2024.pdf" },
-        ],
-      };
-      setMessages((prev) => [...prev, botResponse]);
-    }, 800);
+        sources: data.sources.length > 0 ? data.sources : undefined,
+      }]);
+    } catch {
+      setMessages((prev) => [...prev, {
+        id: prev.length + 1,
+        text: "ขออภัยครับ เกิดข้อผิดพลาดในการเชื่อมต่อระบบ กรุณาลองใหม่อีกครั้ง",
+        sender: "bot" as const,
+        timestamp: new Date(),
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -126,19 +170,13 @@ export function FloatingChat() {
                   <div className="ml-10 max-w-[82%]">
                     <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm">
                       <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2">
-                        แหล่งอ้างอิงเอกสาร PDF
+                        แหล่งอ้างอิงเอกสาร
                       </p>
-                      <ul className="space-y-2 list-none">
+                      <ul className="space-y-1 list-none">
                         {msg.sources.map((s, i) => (
                           <li key={i} className="text-xs text-slate-700 flex gap-2 items-start">
                             <span className="text-amber-500 shrink-0 mt-0.5">•</span>
-                            <span>
-                              <span className="font-medium text-slate-800">{s.title}</span>
-                              {s.page != null && <span className="text-slate-500"> — หน้า {s.page}</span>}
-                              {s.filename && (
-                                <span className="block text-slate-500 mt-0.5 text-[11px]">ไฟล์: {s.filename}</span>
-                              )}
-                            </span>
+                            <span className="text-slate-500">{s}</span>
                           </li>
                         ))}
                       </ul>
@@ -147,6 +185,20 @@ export function FloatingChat() {
                 )}
               </div>
             ))}
+            {isLoading && (
+              <div className="flex gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                  <Sprout size={16} className="text-emerald-600" />
+                </div>
+                <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-md px-4 py-3 shadow-sm">
+                  <div className="flex gap-1 items-center h-5">
+                    <span className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -159,12 +211,13 @@ export function FloatingChat() {
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={handleKeyPress}
                 placeholder="พิมพ์คำถามเกี่ยวกับโรคข้าว..."
-                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 focus:bg-white transition-colors"
+                disabled={isLoading}
+                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 focus:bg-white transition-colors disabled:opacity-60"
               />
               <button
                 type="button"
                 onClick={handleSend}
-                disabled={!inputMessage.trim()}
+                disabled={!inputMessage.trim() || isLoading}
                 className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                 aria-label="ส่งข้อความ"
               >

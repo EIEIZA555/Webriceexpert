@@ -3,45 +3,46 @@ import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
 import { Badge } from "../components/ui/badge";
-import { Sprout, Plus } from "lucide-react";
-import { usePlanStore } from "../store/planStore";
-import { getCurrentStage as getStageFromConfig } from "../lib/planGenerator";
+import { Sprout, Plus, Trash2 } from "lucide-react";
+import { usePlans } from "../hooks/usePlans";
+import { getCurrentStage, RICE_VARIETIES } from "../lib/planGenerator";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 
 export default function Plots() {
   const navigate = useNavigate();
-  const plans = usePlanStore((s) => s.plans);
-  const setCurrentPlanId = usePlanStore((s) => s.setCurrentPlanId);
+  const { plans, loading, setCurrentPlanId, deletePlan } = usePlans();
 
   const handleSelectPlan = (id: string) => {
     setCurrentPlanId(id);
     navigate("/dashboard");
   };
 
-  const computeProgress = (startDate: string, totalDays: number) => {
+  const computeProgress = (startDate: string, varietyId: string) => {
     const start = new Date(startDate);
     start.setHours(0, 0, 0, 0);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const diff = Math.floor(
-      (today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    const pct = Math.min(100, Math.max(0, (diff / totalDays) * 100));
-    return { days: Math.max(0, diff), pct };
+    const diff = Math.floor((today.getTime() - start.getTime()) / 86400000);
+    const total = RICE_VARIETIES.find((v) => v.id === varietyId)?.lifecycleDays ?? 120;
+    return { days: Math.max(0, diff), pct: Math.min(100, Math.max(0, (diff / total) * 100)), total };
   };
+
+  if (loading) {
+    return (
+      <div className="p-6 lg:p-10 flex items-center justify-center">
+        <p className="text-muted-foreground text-sm">กำลังโหลด...</p>
+      </div>
+    );
+  }
 
   if (!plans.length) {
     return (
       <div className="p-6 lg:p-10 max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight">
-              แปลงนา
-            </h2>
-            <p className="text-muted-foreground text-sm">
-              ยังไม่มีแปลงนาในระบบ เริ่มสร้างแปลงแรกของคุณได้เลย
-            </p>
+            <h2 className="text-2xl font-semibold tracking-tight">แปลงนา</h2>
+            <p className="text-muted-foreground text-sm">ยังไม่มีแปลงนาในระบบ เริ่มสร้างแปลงแรกของคุณได้เลย</p>
           </div>
           <Button
             onClick={() => navigate("/create-plan")}
@@ -51,14 +52,13 @@ export default function Plots() {
             เพิ่มแปลงนา
           </Button>
         </div>
-
         <Card className="p-12 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/60 text-center">
           <div className="w-20 h-20 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-4">
             <Sprout className="w-10 h-10 text-emerald-600" />
           </div>
           <h3 className="text-lg font-semibold mb-2">ยังไม่มีแปลงนา</h3>
           <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
-            เมื่อคุณสร้างแผนการปลูก แปลงนาจะถูกแสดงในหน้านี้ และสามารถเลือกให้เป็นแปลงปัจจุบันบนแดชบอร์ดได้
+            เมื่อคุณสร้างแผนการปลูก แปลงนาจะถูกแสดงในหน้านี้
           </p>
           <Button
             onClick={() => navigate("/create-plan")}
@@ -77,9 +77,7 @@ export default function Plots() {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">แปลงนา</h2>
-          <p className="text-muted-foreground text-sm">
-            รายการแปลงนาทั้งหมดของคุณ เลือกแปลงเพื่อดูรายละเอียดในแดชบอร์ด
-          </p>
+          <p className="text-muted-foreground text-sm">รายการแปลงนาทั้งหมดของคุณ</p>
         </div>
         <Button
           onClick={() => navigate("/create-plan")}
@@ -92,9 +90,8 @@ export default function Plots() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {plans.map((plan) => {
-          const { days, pct } = computeProgress(plan.startDate, plan.totalDays);
-          const stage =
-            getStageFromConfig(plan.varietyId, days) ?? "เก็บเกี่ยวแล้ว";
+          const { days, pct, total } = computeProgress(plan.startDate, plan.varietyId);
+          const stage = getCurrentStage(plan.varietyId, days) ?? "เก็บเกี่ยวแล้ว";
 
           return (
             <Card
@@ -111,37 +108,35 @@ export default function Plots() {
                     <h4 className="text-base font-semibold text-foreground">
                       {plan.plotName || "ไม่ระบุชื่อแปลง"}
                     </h4>
-                    <p className="text-xs text-muted-foreground">
-                      {plan.varietyName}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{plan.varietyName}</p>
                   </div>
                 </div>
-                <Badge
-                  variant="outline"
-                  className="border-emerald-500 text-emerald-700 bg-emerald-50 text-xs"
-                >
-                  {stage}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="border-emerald-500 text-emerald-700 bg-emerald-50 text-xs">
+                    {stage}
+                  </Badge>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); deletePlan(plan.id); }}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">พื้นที่</span>
-                  <span>{plan.landSize || "-"} ไร่</span>
+                  <span>{plan.areaRai} ไร่</span>
                 </div>
-                <div className="flex justify_between text-xs">
+                <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">วันที่ปลูก</span>
-                  <span>
-                    {format(new Date(plan.startDate), "d MMM yyyy", {
-                      locale: th,
-                    })}
-                  </span>
+                  <span>{format(new Date(plan.startDate), "d MMM yyyy", { locale: th })}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">อายุแปลง</span>
-                  <span>
-                    {days} วัน จาก {plan.totalDays} วัน
-                  </span>
+                  <span>{days} วัน จาก {total} วัน</span>
                 </div>
                 <div>
                   <div className="flex justify-between text-xs mb-1">
@@ -158,4 +153,3 @@ export default function Plots() {
     </div>
   );
 }
-

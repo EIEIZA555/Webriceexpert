@@ -10,10 +10,19 @@ interface LoginResponse {
   token_type: string;
 }
 
-interface MeResponse {
+interface RegisterResponse {
   id: string;
   username: string;
   role: UserRole;
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> {
+  try {
+    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(base64));
+  } catch {
+    return {};
+  }
 }
 
 export function isAuthenticated(): boolean {
@@ -56,11 +65,13 @@ export async function login(username: string, password: string): Promise<void> {
 
   setAuthToken(data.access_token);
 
-  const me = await apiFetch<MeResponse>("/auth/me", {}, true);
+  const payload = decodeJwtPayload(data.access_token);
+  const sub = typeof payload.sub === "string" ? payload.sub : username;
+  const role = payload.role === "admin" ? "admin" : "user";
 
   try {
-    localStorage.setItem(USERNAME_STORAGE_KEY, me.username);
-    localStorage.setItem(ROLE_STORAGE_KEY, me.role);
+    localStorage.setItem(USERNAME_STORAGE_KEY, sub);
+    localStorage.setItem(ROLE_STORAGE_KEY, role);
   } catch {
     // ignore
   }
@@ -70,21 +81,14 @@ export async function register(
   username: string,
   password: string,
 ): Promise<void> {
-  const data = await apiFetch<LoginResponse>("/auth/register", {
+  const data = await apiFetch<RegisterResponse>("/auth/register", {
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
 
-  setAuthToken(data.access_token);
-
-  const me = await apiFetch<MeResponse>("/auth/me", {}, true);
-
-  try {
-    localStorage.setItem(USERNAME_STORAGE_KEY, me.username);
-    localStorage.setItem(ROLE_STORAGE_KEY, me.role);
-  } catch {
-    // ignore
-  }
+  // register ไม่ return token — login ต่อทันที
+  await login(username, password);
+  void data;
 }
 
 export function clearAuth(): void {
@@ -96,4 +100,3 @@ export function clearAuth(): void {
     // ignore
   }
 }
-
