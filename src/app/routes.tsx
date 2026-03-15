@@ -3,15 +3,19 @@ import { createBrowserRouter, Navigate } from "react-router";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AppLayout } from "./components/AppLayout";
 import Login from "./pages/Login";
+import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Plots from "./pages/Plots";
 import Calendar from "./pages/Calendar";
-import Settings from "./pages/Settings";
-import Todos from "./pages/Todos";
+import Admin from "./pages/Admin";
 import Knowledge from "./pages/Knowledge";
 import CreatePlan from "./pages/CreatePlan";
 
 export const router = createBrowserRouter([
+  {
+    path: "/",
+    Component: Landing,
+  },
   {
     path: "/login",
     Component: Login,
@@ -25,12 +29,16 @@ export const router = createBrowserRouter([
     ),
   },
   {
-    path: "/",
-    element: <AppLayout />,
+    path: "/app",
+    element: (
+      <ProtectedRoute>
+        <AppLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
-        element: <Navigate to="/dashboard" replace />,
+        element: <Navigate to="/app/dashboard" replace />,
       },
       {
         path: "dashboard",
@@ -45,29 +53,17 @@ export const router = createBrowserRouter([
         element: <Calendar />,
       },
       {
-        path: "todos",
-        element: (
-          <ProtectedRoute>
-            <Todos />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "settings",
-        element: (
-          <ProtectedRoute>
-            <Settings />
-          </ProtectedRoute>
-        ),
-      },
-      {
         path: "knowledge",
         element: <Knowledge />,
+      },
+      {
+        path: "admin",
+        element: <Admin />,
       },
     ],
   },
   {
     path: "*",
-    element: <Navigate to="/login" replace />,
+    element: <Navigate to="/" replace />,
   },
 ]);

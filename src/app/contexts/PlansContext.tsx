@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { apiFetch } from "../lib/api";
 import { RICE_VARIETIES, getCurrentStage } from "../lib/planGenerator";
 
@@ -71,7 +71,26 @@ function mapPlan(p: ApiPlan): PlantingPlan {
 
 const CURRENT_PLAN_KEY = "rice_expert_current_plan_id";
 
-export function usePlans() {
+interface PlansContextValue {
+  plans: PlantingPlan[];
+  plan: PlantingPlan | null;
+  loading: boolean;
+  error: string | null;
+  currentPlanId: string | null;
+  setCurrentPlanId: (id: string) => void;
+  createPlan: (params: { varietyId: string; startDate: string; plotName: string; landSize: string }) => Promise<PlantingPlan>;
+  toggleTask: (planId: string, taskId: string) => Promise<void>;
+  deletePlan: (planId: string) => Promise<void>;
+  getDaysSinceStart: () => number;
+  getTotalDays: () => number;
+  getProgressPercent: () => number;
+  getCurrentStageName: () => string | null;
+  getUpcomingTasks: (daysAhead?: number) => PlanTask[];
+}
+
+const PlansContext = createContext<PlansContextValue | null>(null);
+
+export function PlansProvider({ children }: { children: React.ReactNode }) {
   const [plans, setPlans] = useState<PlantingPlan[]>([]);
   const [currentPlanId, setCurrentPlanIdState] = useState<string | null>(
     () => localStorage.getItem(CURRENT_PLAN_KEY),
@@ -84,7 +103,6 @@ export function usePlans() {
       const data = await apiFetch<ApiPlan[]>("/plans/", {}, true);
       const mapped = data.map(mapPlan);
       setPlans(mapped);
-      // ถ้า currentPlanId ไม่มีในรายการ → ใช้อันแรก
       setCurrentPlanIdState((prev) => {
         if (prev && mapped.find((p) => p.id === prev)) return prev;
         const first = mapped[0]?.id ?? null;
@@ -108,27 +126,18 @@ export function usePlans() {
   }, []);
 
   const createPlan = useCallback(
-    async (params: {
-      varietyId: string;
-      startDate: string;
-      plotName: string;
-      landSize: string;
-    }) => {
+    async (params: { varietyId: string; startDate: string; plotName: string; landSize: string }) => {
       const variety = RICE_VARIETIES.find((v) => v.id === params.varietyId)!;
-
-      const body = {
-        variety_id: params.varietyId,
-        variety_name: variety.name,
-        start_date: params.startDate,
-        area_rai: parseFloat(params.landSize),
-        plot_name: params.plotName,
-      };
-
       const data = await apiFetch<ApiPlan>("/plans/", {
         method: "POST",
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          variety_id: params.varietyId,
+          variety_name: variety.name,
+          start_date: params.startDate,
+          area_rai: parseFloat(params.landSize),
+          plot_name: params.plotName,
+        }),
       }, true);
-
       const newPlan = mapPlan(data);
       setPlans((prev) => [...prev, newPlan]);
       setCurrentPlanId(newPlan.id);
@@ -167,7 +176,6 @@ export function usePlans() {
     });
   }, [currentPlanId]);
 
-  // derived
   const plan = plans.find((p) => p.id === currentPlanId) ?? null;
 
   const getDaysSinceStart = () => {
@@ -210,20 +218,20 @@ export function usePlans() {
       .sort((a, b) => a.date.localeCompare(b.date));
   };
 
-  return {
-    plans,
-    plan,
-    loading,
-    error,
-    currentPlanId,
-    setCurrentPlanId,
-    createPlan,
-    toggleTask,
-    deletePlan,
-    getDaysSinceStart,
-    getTotalDays,
-    getProgressPercent,
-    getCurrentStageName,
-    getUpcomingTasks,
-  };
+  return (
+    <PlansContext.Provider value={{
+      plans, plan, loading, error, currentPlanId,
+      setCurrentPlanId, createPlan, toggleTask, deletePlan,
+      getDaysSinceStart, getTotalDays, getProgressPercent,
+      getCurrentStageName, getUpcomingTasks,
+    }}>
+      {children}
+    </PlansContext.Provider>
+  );
+}
+
+export function usePlans() {
+  const ctx = useContext(PlansContext);
+  if (!ctx) throw new Error("usePlans must be used within PlansProvider");
+  return ctx;
 }

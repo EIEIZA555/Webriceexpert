@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Sprout } from "lucide-react";
+import { MessageCircle, X, Sprout, SendHorizonal } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { isAuthenticated } from "../lib/auth";
 
@@ -33,12 +33,20 @@ interface HistoryItem {
   created_at: string;
 }
 
+interface PromptTemplate {
+  id: string;
+  title: string;
+  content: string;
+}
+
 export function FloatingChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const [hasSentMessage, setHasSentMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -48,6 +56,12 @@ export function FloatingChat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    apiFetch<PromptTemplate[]>("/prompts/", {}, false)
+      .then(setTemplates)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!isOpen || historyLoaded || !isAuthenticated()) return;
@@ -75,6 +89,7 @@ export function FloatingChat() {
     };
     setMessages((prev) => [...prev, userMessage]);
     setInputMessage("");
+    setHasSentMessage(true);
     setIsLoading(true);
 
     try {
@@ -202,6 +217,21 @@ export function FloatingChat() {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Prompt Templates */}
+          {templates.length > 0 && !hasSentMessage && (
+            <div className="shrink-0 px-4 pt-3 pb-0 bg-white border-t border-slate-100 flex gap-2 flex-wrap">
+              {templates.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setInputMessage(t.content)}
+                  className="text-xs px-3 py-1.5 rounded-full border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
+                >
+                  {t.title}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Input */}
           <div className="shrink-0 p-4 pt-3 bg-white border-t border-slate-100">
             <div className="flex gap-2 items-end">
@@ -218,10 +248,18 @@ export function FloatingChat() {
                 type="button"
                 onClick={handleSend}
                 disabled={!inputMessage.trim() || isLoading}
-                className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-all duration-150 ${
+                  inputMessage.trim() && !isLoading
+                    ? "bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-md hover:shadow-lg active:scale-95"
+                    : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                }`}
                 aria-label="ส่งข้อความ"
               >
-                <MessageCircle size={20} strokeWidth={2} />
+                {inputMessage.trim() ? (
+                  <SendHorizonal size={18} strokeWidth={2} />
+                ) : (
+                  <MessageCircle size={18} strokeWidth={2} />
+                )}
               </button>
             </div>
             <p className="text-[11px] text-slate-400 mt-2 text-center">กด Enter เพื่อส่ง</p>

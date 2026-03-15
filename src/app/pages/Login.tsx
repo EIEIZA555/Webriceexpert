@@ -1,24 +1,24 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
-import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import { useNavigate, useSearchParams } from "react-router";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Leaf, LogIn, Eye, EyeOff } from "lucide-react";
+import { Leaf, LogIn, Eye, EyeOff, Bot, CalendarDays, BarChart2, BookOpen, ArrowLeft } from "lucide-react";
 import { isAuthenticated, login, register } from "../lib/auth";
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [isRegister, setIsRegister] = useState(false);
+  const [isRegister, setIsRegister] = useState(searchParams.get("register") === "1");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated()) {
-      navigate("/dashboard", { replace: true });
+      navigate("/app/dashboard", { replace: true });
     }
   }, [navigate]);
 
@@ -26,17 +26,15 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
       if (isRegister) {
         await register(username, password);
       } else {
         await login(username, password);
       }
-      navigate("/dashboard", { replace: true });
+      navigate("/app/dashboard", { replace: true });
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "ไม่สามารถติดต่อเซิร์ฟเวอร์ได้";
+      const message = err instanceof Error ? err.message : "ไม่สามารถติดต่อเซิร์ฟเวอร์ได้";
       setError(message);
       setLoading(false);
     }
@@ -46,45 +44,63 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left side - Image with overlay */}
-      <div className="hidden lg:flex lg:w-1/2 relative">
-        <ImageWithFallback
-          src="https://images.unsplash.com/photo-1655903724829-37b3cd3d4ab9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxncmVlbiUyMHJpY2UlMjBmaWVsZCUyMHBhZGR5fGVufDF8fHx8MTc3MDk5MzIzN3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
-          alt="Rice field"
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-[#059669]/80 flex items-center justify-center">
-          <div className="text-white text-center">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <Leaf className="w-12 h-12" />
-              <h1 className="text-4xl">Rice Expert</h1>
-            </div>
-            <p className="text-lg opacity-90">ระบบจัดการแปลงนาอัจฉริยะ</p>
+      {/* Left side */}
+      <div className="hidden lg:flex lg:w-1/2 bg-primary flex-col justify-between p-12">
+        <button onClick={() => navigate("/")} className="flex items-center gap-2 text-white hover:opacity-80 transition-opacity">
+          <Leaf className="w-7 h-7" />
+          <span className="text-lg font-semibold">Rice Expert</span>
+        </button>
+
+        <div className="text-white">
+          <h2 className="text-3xl font-semibold mb-2">ระบบผู้เชี่ยวชาญการปลูกข้าว</h2>
+          <p className="text-white/70 text-sm mb-10">เข้าสู่ระบบเพื่อใช้งานฟีเจอร์ครบถ้วน</p>
+          <div className="space-y-4">
+            {[
+              { icon: Bot, label: "ถาม-ตอบด้วย AI", desc: "ถามเรื่องโรค ปุ๋ย การดูแลข้าวได้ทันที" },
+              { icon: CalendarDays, label: "วางแผนการปลูก", desc: "สร้างแผนงานและปฏิทินดูแลแปลงนา" },
+              { icon: BarChart2, label: "ติดตามแปลงนา", desc: "ดูความคืบหน้าและงานที่ต้องทำ" },
+              { icon: BookOpen, label: "คลังความรู้", desc: "เอกสารวิชาการข้าวพร้อมอ้างอิง" },
+            ].map(({ icon: Icon, label, desc }) => (
+              <div key={label} className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                  <Icon className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">{label}</p>
+                  <p className="text-xs text-white/60">{desc}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
+
+        <div />
       </div>
 
-      {/* Right side - Login form */}
+      {/* Right side */}
       <div className="flex-1 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-md">
-          {/* Mobile logo */}
-          <div className="lg:hidden flex items-center justify-center gap-2 mb-8">
-            <Leaf className="w-8 h-8 text-primary" />
-            <h1 className="text-2xl text-primary">Rice Expert</h1>
-          </div>
+
+          <button
+            onClick={() => navigate("/")}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            กลับหน้าหลัก
+          </button>
 
           <div className="mb-8">
-            <h2 className="text-2xl mb-2">
+            <h2 className="text-2xl font-semibold mb-1">
               {isRegister ? "สมัครสมาชิก" : "ยินดีต้อนรับ"}
             </h2>
-            <p className="text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {isRegister
                 ? "สร้างบัญชีเพื่อบันทึกแผนและประวัติการใช้งาน"
-                : "เข้าสู่ระบบเพื่อจัดการแปลงนาของคุณ"}
+                : "เข้าสู่ระบบเพื่อใช้งานระบบผู้เชี่ยวชาญการปลูกข้าว"}
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="username">ชื่อผู้ใช้</Label>
               <Input
@@ -92,11 +108,8 @@ export default function Login() {
                 type="text"
                 placeholder="กรอกชื่อผู้ใช้"
                 value={username}
-                onChange={(e) => {
-                  setUsername(e.target.value);
-                  setError("");
-                }}
-                className="rounded-lg bg-input-background border-border"
+                onChange={(e) => { setUsername(e.target.value); setError(""); }}
+                className="rounded-lg"
                 autoComplete="username"
                 required
               />
@@ -110,11 +123,8 @@ export default function Login() {
                   type={showPassword ? "text" : "password"}
                   placeholder="กรอกรหัสผ่าน"
                   value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError("");
-                  }}
-                  className="rounded-lg bg-input-background border-border pr-10"
+                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  className="rounded-lg pr-10"
                   autoComplete="current-password"
                   required
                 />
@@ -138,16 +148,16 @@ export default function Login() {
             <Button
               type="submit"
               disabled={loading || !username.trim() || !password}
-              className="w-full rounded-lg h-12 bg-primary hover:bg-primary/90 disabled:opacity-50"
+              className="w-full rounded-lg h-11 bg-primary hover:bg-primary/90 disabled:opacity-50"
             >
               {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                   {isRegister ? "กำลังสมัครสมาชิก..." : "กำลังเข้าสู่ระบบ..."}
                 </span>
               ) : (
-                <span className="flex items-center justify-center gap-2">
-                  <LogIn size={20} />
+                <span className="flex items-center gap-2">
+                  <LogIn size={18} />
                   {isRegister ? "สมัครสมาชิก" : "เข้าสู่ระบบ"}
                 </span>
               )}
@@ -158,28 +168,14 @@ export default function Login() {
             {isRegister ? (
               <>
                 มีบัญชีอยู่แล้ว?{" "}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsRegister(false);
-                    setError("");
-                  }}
-                  className="text-primary hover:underline"
-                >
+                <button type="button" onClick={() => { setIsRegister(false); setError(""); }} className="text-primary hover:underline">
                   เข้าสู่ระบบ
                 </button>
               </>
             ) : (
               <>
                 ยังไม่มีบัญชี?{" "}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsRegister(true);
-                    setError("");
-                  }}
-                  className="text-primary hover:underline"
-                >
+                <button type="button" onClick={() => { setIsRegister(true); setError(""); }} className="text-primary hover:underline">
                   สมัครสมาชิก
                 </button>
               </>

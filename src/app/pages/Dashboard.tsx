@@ -10,7 +10,7 @@ import {
   Circle,
   Calendar,
 } from "lucide-react";
-import { usePlans } from "../hooks/usePlans";
+import { usePlans } from "../contexts/PlansContext";
 import { motion } from "motion/react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
@@ -263,7 +263,7 @@ export default function Dashboard() {
       {/* Plots Grid */}
       <div className="mb-5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
         <h3 className="text-base font-semibold text-foreground">แปลงนาทั้งหมด</h3>
-        <Button variant="ghost" size="sm" onClick={() => navigate("/plots")} className="text-primary">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/app/plots")} className="text-primary">
           ดูทั้งหมด
         </Button>
       </div>
@@ -278,7 +278,7 @@ export default function Dashboard() {
               <Card
                 key={p.id}
                 className="p-6 rounded-2xl border border-slate-100 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-all cursor-pointer hover:border-slate-200"
-                onClick={() => navigate("/plots")}
+                onClick={() => navigate("/app/plots")}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">

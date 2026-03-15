@@ -3,10 +3,10 @@ import { Card } from "../components/ui/card";
 
 export default function Settings() {
   return (
-    <div className="p-4 lg:p-8">
+    <div className="p-6 lg:p-10 max-w-2xl mx-auto">
       <div className="mb-6">
-        <h2 className="text-2xl mb-1">ตั้งค่า</h2>
-        <p className="text-muted-foreground">จัดการบัญชีและค่าต่างๆ ของแอป</p>
+        <h2 className="text-2xl font-semibold">ตั้งค่า</h2>
+        <p className="text-sm text-muted-foreground mt-1">จัดการบัญชีและการตั้งค่าแอป</p>
       </div>
 
       <div className="max-w-2xl space-y-4">
@@ -21,7 +21,7 @@ export default function Settings() {
             <SettingsIcon className="w-8 h-8 text-muted-foreground" />
             <div>
               <h3 className="font-medium">Rice Expert</h3>
-              <p className="text-sm text-muted-foreground">ระบบจัดการแปลงนาอัจฉริยะ</p>
+              <p className="text-sm text-muted-foreground">ระบบผู้เชี่ยวชาญการปลูกข้าว</p>
             </div>
           </div>
         </Card>

@@ -5,7 +5,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { ArrowLeft, Check, Leaf } from "lucide-react";
-import { usePlans } from "../hooks/usePlans";
+import { usePlans } from "../contexts/PlansContext";
 
 const riceVarieties = [
   { id: "jasmine", name: "ข้าวหอมมะลิ", description: "เหมาะสำหรับฤดูฝน" },
@@ -28,7 +28,7 @@ export default function CreatePlan() {
   const [error, setError] = useState<string | null>(null);
 
   const handleBack = () => {
-    if (step === 1) navigate("/dashboard");
+    if (step === 1) navigate("/app/dashboard");
     else setStep(step - 1);
   };
 
@@ -47,7 +47,7 @@ export default function CreatePlan() {
         plotName: formData.plotName,
         landSize: formData.landSize,
       });
-      navigate("/dashboard");
+      navigate("/app/dashboard");
     } catch (e) {
       setError((e as Error).message);
     } finally {

@@ -4,7 +4,7 @@ import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
 import { Badge } from "../components/ui/badge";
 import { Sprout, Plus, Trash2 } from "lucide-react";
-import { usePlans } from "../hooks/usePlans";
+import { usePlans } from "../contexts/PlansContext";
 import { getCurrentStage, RICE_VARIETIES } from "../lib/planGenerator";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
@@ -15,7 +15,7 @@ export default function Plots() {
 
   const handleSelectPlan = (id: string) => {
     setCurrentPlanId(id);
-    navigate("/dashboard");
+    navigate("/app/dashboard");
   };
 
   const computeProgress = (startDate: string, varietyId: string) => {

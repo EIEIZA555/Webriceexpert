@@ -39,11 +39,11 @@ export default function Todos() {
   const doneCount = todos.filter((t) => t.done).length;
 
   return (
-    <div className="p-4 lg:p-8">
+    <div className="p-6 lg:p-10 max-w-2xl mx-auto">
       <div className="mb-6">
-        <h2 className="text-2xl mb-1">บันทึกสิ่งที่ต้องทำ</h2>
-        <p className="text-muted-foreground">
-          จัดการรายการที่ต้องทำของคุณ (แต่ละบัญชีเห็นเฉพาะของตัวเอง)
+        <h2 className="text-2xl font-semibold">บันทึกสิ่งที่ต้องทำ</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          รายการที่ต้องทำส่วนตัว เห็นเฉพาะของบัญชีคุณเอง
         </p>
       </div>
 

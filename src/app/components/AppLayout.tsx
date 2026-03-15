@@ -4,25 +4,23 @@ import {
   LayoutDashboard,
   Sprout,
   Calendar,
-  Settings,
   LogOut,
   Leaf,
   Plus,
   Menu,
   BookOpen,
-  ListTodo,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState } from "react";
 import { FloatingChat } from "./FloatingChat";
+import { PlansProvider } from "../contexts/PlansContext";
 
 const navItems = [
-  { path: "/dashboard", label: "แดชบอร์ด", icon: LayoutDashboard, adminOnly: false },
-  { path: "/plots", label: "แปลงนา", icon: Sprout, adminOnly: false },
-  { path: "/calendar", label: "ปฏิทิน", icon: Calendar, adminOnly: false },
-  { path: "/todos", label: "บันทึกสิ่งที่ต้องทำ", icon: ListTodo, adminOnly: false },
-  { path: "/settings", label: "ตั้งค่า", icon: Settings, adminOnly: false },
-  { path: "/knowledge", label: "คลังข้อมูล PDF", icon: BookOpen, adminOnly: true },
+  { path: "/app/dashboard", label: "แดชบอร์ด", icon: LayoutDashboard, adminOnly: false },
+  { path: "/app/plots", label: "แปลงนา", icon: Sprout, adminOnly: false },
+  { path: "/app/calendar", label: "ปฏิทิน", icon: Calendar, adminOnly: false },
+  { path: "/app/knowledge", label: "คลังความรู้", icon: BookOpen, adminOnly: false },
+  { path: "/app/admin", label: "จัดการระบบ", icon: BookOpen, adminOnly: true },
 ];
 
 export function AppLayout() {
@@ -33,7 +31,7 @@ export function AppLayout() {
 
   const handleLogout = () => {
     clearAuth();
-    navigate("/login", { replace: true });
+    navigate("/", { replace: true });
   };
 
   const handleCreatePlan = () => {
@@ -41,12 +39,12 @@ export function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="h-screen bg-gray-50 flex overflow-hidden">
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-border hidden lg:flex flex-col">
         <div className="p-6 border-b border-border">
           <button
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/app/dashboard")}
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
             <Leaf className="w-8 h-8 text-primary" />
@@ -64,7 +62,7 @@ export function AppLayout() {
                 <li key={path}>
                   <button
                     onClick={() => navigate(path)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                    className={`w-full h-11 flex items-center gap-3 px-4 rounded-lg transition-colors ${
                       isActive ? "bg-primary text-white" : "text-foreground hover:bg-accent"
                     }`}
                   >
@@ -114,7 +112,7 @@ export function AppLayout() {
           <Menu className="w-6 h-6" />
         </button>
         <button
-          onClick={() => navigate("/dashboard")}
+          onClick={() => navigate("/app/dashboard")}
           className="flex items-center gap-2"
         >
           <Leaf className="w-6 h-6 text-primary" />
@@ -132,17 +130,17 @@ export function AppLayout() {
         />
       )}
       <div
-        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r shadow-xl transition-transform duration-200 ${
+        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r shadow-xl transition-transform duration-200 flex flex-col ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="p-4 pt-14 border-b border-border">
+        <div className="p-4 pt-14 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <Leaf className="w-8 h-8 text-primary" />
             <span className="font-semibold">Rice Expert</span>
           </div>
         </div>
-        <nav className="p-4">
+        <nav className="flex-1 overflow-y-auto p-4">
           <ul className="space-y-1">
             {navItems
               .filter((item) => !item.adminOnly || isAdmin())
@@ -155,7 +153,7 @@ export function AppLayout() {
                       navigate(path);
                       setMobileMenuOpen(false);
                     }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                    className={`w-full h-11 flex items-center gap-3 px-4 rounded-lg transition-colors ${
                       isActive ? "bg-primary text-white" : "text-foreground hover:bg-accent"
                     }`}
                   >
@@ -201,12 +199,12 @@ export function AppLayout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <Outlet />
-      </main>
-
-      {/* Floating Chatbot */}
-      <FloatingChat />
+      <PlansProvider>
+        <main className="flex-1 overflow-auto">
+          <Outlet />
+        </main>
+        <FloatingChat />
+      </PlansProvider>
     </div>
   );
 }

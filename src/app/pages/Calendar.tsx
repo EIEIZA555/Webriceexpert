@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CalendarDays } from "lucide-react";
-import { usePlans, type PlanTask } from "../hooks/usePlans";
+import { usePlans, type PlanTask } from "../contexts/PlansContext";
 import { DayPicker, type DayContentProps } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { format } from "date-fns";
