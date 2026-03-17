@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { FileText, Upload, Trash2, ExternalLink, HelpCircle, MessageSquare, Plus } from "lucide-react";
+import {
+  FileText,
+  Upload,
+  Trash2,
+  ExternalLink,
+  HelpCircle,
+  MessageSquare,
+  Plus,
+} from "lucide-react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import {
@@ -13,6 +21,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "../components/ui/dialog";
 import { apiFetch, API_BASE_URL, getAuthToken } from "../lib/api";
 
 type Tab = "docs" | "faq" | "prompts";
@@ -21,7 +36,13 @@ interface DocumentResponse {
   id: string;
   filename: string;
   file_type: string;
+  chroma_collection: string;
   created_at: string;
+}
+
+interface CollectionItem {
+  value: string;
+  label: string;
 }
 
 interface FaqItem {
@@ -36,6 +57,14 @@ interface PromptTemplate {
   created_at: string;
 }
 
+const UPLOAD_COLLECTIONS: { value: string; label: string }[] = [
+  { value: "jasmine", label: "ข้าวหอมมะลิ" },
+  { value: "rd43", label: "ข้าว RD43" },
+  { value: "kk15", label: "ข้าวกข 15" },
+  { value: "pathumthani", label: "ข้าวปทุมธานี" },
+  { value: "general", label: "ทั่วไป" },
+];
+
 function FaqTab({ faq, faqLoading }: { faq: FaqItem[]; faqLoading: boolean }) {
   return (
     <div className="space-y-4">
@@ -48,9 +77,13 @@ function FaqTab({ faq, faqLoading }: { faq: FaqItem[]; faqLoading: boolean }) {
         <div className="divide-y divide-border border border-border rounded-xl overflow-hidden bg-white">
           {faq.map((item, i) => (
             <div key={i} className="flex items-baseline gap-4 px-5 py-3">
-              <span className="text-xs text-muted-foreground w-4 shrink-0">{i + 1}</span>
+              <span className="text-xs text-muted-foreground w-4 shrink-0">
+                {i + 1}
+              </span>
               <p className="flex-1 text-sm">{item.question}</p>
-              <span className="text-xs text-muted-foreground shrink-0">{item.count} ครั้ง</span>
+              <span className="text-xs text-muted-foreground shrink-0">
+                {item.count} ครั้ง
+              </span>
             </div>
           ))}
         </div>
@@ -64,9 +97,13 @@ export default function Admin() {
 
   // --- Docs state ---
   const [documents, setDocuments] = useState<DocumentResponse[]>([]);
+  const [collections, setCollections] = useState<CollectionItem[]>([]);
   const [docsLoading, setDocsLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [docsError, setDocsError] = useState<string | null>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [selectedCollection, setSelectedCollection] = useState("general");
+  const [pendingFiles, setPendingFiles] = useState<FileList | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- FAQ state ---
@@ -83,10 +120,16 @@ export default function Admin() {
   const [promptsError, setPromptsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // fetch docs on mount
+  // fetch docs + collections on mount
   useEffect(() => {
-    apiFetch<DocumentResponse[]>("/documents/", {}, false)
-      .then(setDocuments)
+    Promise.all([
+      apiFetch<DocumentResponse[]>("/documents/", {}, false),
+      apiFetch<CollectionItem[]>("/documents/collections", {}, false),
+    ])
+      .then(([docs, cols]) => {
+        setDocuments(docs);
+        setCollections(cols);
+      })
       .catch((e) => setDocsError((e as Error).message))
       .finally(() => setDocsLoading(false));
   }, []);
@@ -98,7 +141,10 @@ export default function Admin() {
       apiFetch<FaqItem[]>("/admin/faq", {}, true)
         .then(setFaq)
         .catch(() => {})
-        .finally(() => { setFaqLoading(false); setFaqLoaded(true); });
+        .finally(() => {
+          setFaqLoading(false);
+          setFaqLoaded(true);
+        });
     }
   }, [activeTab, faqLoaded]);
 
@@ -109,18 +155,23 @@ export default function Admin() {
       apiFetch<PromptTemplate[]>("/prompts/", {}, false)
         .then(setPrompts)
         .catch(() => {})
-        .finally(() => { setPromptsLoading(false); setPromptsLoaded(true); });
+        .finally(() => {
+          setPromptsLoading(false);
+          setPromptsLoaded(true);
+        });
     }
   }, [activeTab, promptsLoaded]);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
     const files = e.target.files;
-    if (!files || files.length === 0) return;
     setUploading(true);
     setDocsError(null);
+    setUploadDialogOpen(false);
     try {
       const formData = new FormData();
       for (const file of Array.from(files)) formData.append("files", file);
+      formData.append("collection", selectedCollection);
       const token = getAuthToken();
       const res = await fetch(`${API_BASE_URL}/documents/upload`, {
         method: "POST",
@@ -129,10 +180,16 @@ export default function Admin() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error((data as { detail?: string }).detail ?? "อัพโหลดไม่สำเร็จ");
+        throw new Error(
+          (data as { detail?: string }).detail ?? "อัพโหลดไม่สำเร็จ",
+        );
       }
-      const fresh = await apiFetch<DocumentResponse[]>("/documents/", {}, false);
-      setDocuments(fresh);
+      const [docs, cols] = await Promise.all([
+        apiFetch<DocumentResponse[]>("/documents/", {}, false),
+        apiFetch<CollectionItem[]>("/documents/collections", {}, false),
+      ]);
+      setDocuments(docs);
+      setCollections(cols);
     } catch (e) {
       setDocsError((e as Error).message);
     } finally {
@@ -155,10 +212,17 @@ export default function Admin() {
     setSaving(true);
     setPromptsError(null);
     try {
-      const created = await apiFetch<PromptTemplate>("/prompts/", {
-        method: "POST",
-        body: JSON.stringify({ title: newTitle.trim(), content: newContent.trim() }),
-      }, true);
+      const created = await apiFetch<PromptTemplate>(
+        "/prompts/",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            title: newTitle.trim(),
+            content: newContent.trim(),
+          }),
+        },
+        true,
+      );
       setPrompts((prev) => [...prev, created]);
       setNewTitle("");
       setNewContent("");
@@ -179,16 +243,26 @@ export default function Admin() {
   };
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: "docs", label: `เอกสาร (${documents.length})`, icon: <FileText className="w-4 h-4" /> },
+    {
+      key: "docs",
+      label: `เอกสาร (${documents.length})`,
+      icon: <FileText className="w-4 h-4" />,
+    },
     { key: "faq", label: "FAQ", icon: <HelpCircle className="w-4 h-4" /> },
-    { key: "prompts", label: "Prompt Templates", icon: <MessageSquare className="w-4 h-4" /> },
+    {
+      key: "prompts",
+      label: "Prompt Templates",
+      icon: <MessageSquare className="w-4 h-4" />,
+    },
   ];
 
   return (
     <div className="p-6 lg:p-10">
       <div className="mb-6">
         <h2 className="text-2xl font-semibold">จัดการระบบ</h2>
-        <p className="text-sm text-muted-foreground mt-1">เอกสาร, คำถามที่พบบ่อย และ Prompt Templates</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          เอกสาร, คำถามที่พบบ่อย และ Prompt Templates
+        </p>
       </div>
 
       {/* Tabs */}
@@ -198,7 +272,9 @@ export default function Admin() {
             key={key}
             onClick={() => setActiveTab(key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
-              activeTab === key ? "bg-primary text-white" : "bg-white border border-border text-foreground hover:bg-accent"
+              activeTab === key
+                ? "bg-primary text-white"
+                : "bg-white border border-border text-foreground hover:bg-accent"
             }`}
           >
             {icon}
@@ -210,78 +286,175 @@ export default function Admin() {
       {/* Documents Tab */}
       {activeTab === "docs" && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="font-medium">เอกสารในระบบ</h3>
+          <div className="flex items-center gap-3">
+            <h3 className="font-medium flex-1">เอกสารในระบบ</h3>
             <Button
               className="bg-primary hover:bg-primary/90 rounded-lg"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                setSelectedCollection("general");
+                setUploadDialogOpen(true);
+              }}
               disabled={uploading}
             >
               <Upload className="w-4 h-4 mr-2" />
               {uploading ? "กำลังอัพโหลด..." : "อัพโหลด"}
             </Button>
-            <input ref={fileInputRef} type="file" accept=".pdf,.txt,.docx" multiple className="hidden" onChange={handleUpload} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.txt,.docx"
+              multiple
+              className="hidden"
+              onChange={handleFileChange}
+            />
           </div>
 
-          {docsError && <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm">{docsError}</div>}
+          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>อัพโหลดเอกสาร</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-1.5 py-2">
+                <label className="text-sm font-medium">หมวดหมู่เอกสาร</label>
+                <select
+                  value={selectedCollection}
+                  onChange={(e) => setSelectedCollection(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                >
+                  {UPLOAD_COLLECTIONS.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setUploadDialogOpen(false)}
+                >
+                  ยกเลิก
+                </Button>
+                <Button
+                  className="bg-primary hover:bg-primary/90"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  เลือกไฟล์
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {docsError && (
+            <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm">
+              {docsError}
+            </div>
+          )}
 
           {docsLoading ? (
             <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
           ) : documents.length === 0 ? (
-            <Card className="p-8 rounded-xl text-center text-muted-foreground text-sm">ยังไม่มีเอกสารในระบบ</Card>
+            <Card className="p-8 rounded-xl text-center text-muted-foreground text-sm">
+              ยังไม่มีเอกสารในระบบ
+            </Card>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {documents.map((doc) => (
-                <Card key={doc.id} className="p-4 rounded-xl flex flex-col gap-3 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <FileText className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate text-sm">{doc.filename}</p>
-                      <p className="text-xs text-muted-foreground">{doc.file_type.toUpperCase()} • {doc.created_at.slice(0, 10)}</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="rounded-lg flex-1" onClick={() => window.open(`${API_BASE_URL}/documents/${doc.id}/file`, "_blank")}>
-                      <ExternalLink className="w-4 h-4 mr-1" />เปิดอ่าน
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="rounded-lg text-destructive hover:text-destructive">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>ลบเอกสาร</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            ต้องการลบ "{doc.filename}" ใช่ไหม? การลบจะไม่สามารถกู้คืนได้
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-destructive hover:bg-destructive/90"
-                            onClick={() => handleDeleteDoc(doc.id)}
+            <div className="space-y-6">
+              {[...collections, { value: "__other__", label: "อื่นๆ" }].map(
+                ({ value, label }) => {
+                  const knownValues = collections.map((c) => c.value);
+                  const group =
+                    value === "__other__"
+                      ? documents.filter(
+                          (d) => !knownValues.includes(d.chroma_collection),
+                        )
+                      : documents.filter((d) => d.chroma_collection === value);
+                  if (group.length === 0) return null;
+                  return (
+                    <div key={value}>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-3">
+                        {label} ({group.length})
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {group.map((doc) => (
+                          <Card
+                            key={doc.id}
+                            className="p-4 rounded-xl flex flex-row items-center gap-3 hover:shadow-md transition-shadow"
                           >
-                            ลบ
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </Card>
-              ))}
+                            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                              <FileText className="w-4 h-4 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate text-sm">
+                                {doc.filename}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {doc.file_type.toUpperCase()} •{" "}
+                                {doc.created_at.slice(0, 10)}
+                              </p>
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-lg"
+                                onClick={() =>
+                                  window.open(
+                                    `${API_BASE_URL}/documents/${doc.id}/file`,
+                                    "_blank",
+                                  )
+                                }
+                              >
+                                <ExternalLink className="w-4 h-4 mr-1" />
+                                เปิดอ่าน
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="rounded-lg text-destructive hover:text-destructive"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      ลบเอกสาร
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      ต้องการลบ "{doc.filename}" ใช่ไหม?
+                                      การลบจะไม่สามารถกู้คืนได้
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>
+                                      ยกเลิก
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="bg-destructive hover:bg-destructive/90"
+                                      onClick={() => handleDeleteDoc(doc.id)}
+                                    >
+                                      ลบ
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                },
+              )}
             </div>
           )}
         </div>
       )}
 
       {/* FAQ Tab */}
-      {activeTab === "faq" && (
-        <FaqTab faq={faq} faqLoading={faqLoading} />
-      )}
+      {activeTab === "faq" && <FaqTab faq={faq} faqLoading={faqLoading} />}
 
       {/* Prompt Templates Tab */}
       {activeTab === "prompts" && (
@@ -303,7 +476,9 @@ export default function Admin() {
               rows={4}
               className="w-full px-3 py-2 rounded-lg border border-border bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
             />
-            {promptsError && <p className="text-sm text-red-600">{promptsError}</p>}
+            {promptsError && (
+              <p className="text-sm text-red-600">{promptsError}</p>
+            )}
             <Button
               onClick={handleAddPrompt}
               disabled={!newTitle.trim() || !newContent.trim() || saving}
@@ -317,50 +492,66 @@ export default function Admin() {
 
           {/* List */}
           <div className="flex justify-between items-center">
-            <h3 className="font-medium">Templates ทั้งหมด ({prompts.length})</h3>
+            <h3 className="font-medium">
+              Templates ทั้งหมด ({prompts.length})
+            </h3>
           </div>
           {promptsLoading ? (
             <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
           ) : prompts.length === 0 ? (
-            <Card className="p-8 rounded-xl text-center text-muted-foreground text-sm">ยังไม่มี template</Card>
+            <Card className="p-8 rounded-xl text-center text-muted-foreground text-sm">
+              ยังไม่มี template
+            </Card>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {prompts.map((p) => (
-                <Card key={p.id} className="p-4 rounded-xl flex flex-col gap-3 hover:shadow-md transition-shadow">
+                <Card
+                  key={p.id}
+                  className="p-4 rounded-xl flex flex-col gap-2 hover:shadow-md transition-shadow"
+                >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                       <MessageSquare className="w-4 h-4 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate text-sm">{p.title}</p>
-                      <p className="text-xs text-muted-foreground">{p.created_at.slice(0, 10)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.created_at.slice(0, 10)}
+                      </p>
                     </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-wrap">{p.content}</p>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="rounded-lg text-destructive hover:text-destructive">
-                        <Trash2 className="w-4 h-4 mr-1" />ลบ
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>ลบ Template</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          ต้องการลบ "{p.title}" ใช่ไหม? การลบจะไม่สามารถกู้คืนได้
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive hover:bg-destructive/90"
-                          onClick={() => handleDeletePrompt(p.id)}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-lg text-destructive hover:text-destructive shrink-0"
                         >
-                          ลบ
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>ลบ Template</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            ต้องการลบ "{p.title}" ใช่ไหม?
+                            การลบจะไม่สามารถกู้คืนได้
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive hover:bg-destructive/90"
+                            onClick={() => handleDeletePrompt(p.id)}
+                          >
+                            ลบ
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2 whitespace-pre-wrap">
+                    {p.content}
+                  </p>
                 </Card>
               ))}
             </div>
