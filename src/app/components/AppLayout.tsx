@@ -35,7 +35,7 @@ export function AppLayout() {
   };
 
   const handleCreatePlan = () => {
-    navigate("/create-plan");
+    navigate("/app/create-plan");
   };
 
   return (
@@ -177,7 +177,7 @@ export function AppLayout() {
           </div>
           <Button
             onClick={() => {
-              navigate("/create-plan");
+              navigate("/app/create-plan");
               setMobileMenuOpen(false);
             }}
             className="w-full justify-start rounded-lg bg-primary hover:bg-primary/90"

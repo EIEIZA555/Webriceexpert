@@ -80,7 +80,7 @@ export default function Dashboard() {
           </p>
         </div>
         <Button
-          onClick={() => navigate("/create-plan")}
+          onClick={() => navigate("/app/create-plan")}
           className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-11 px-6 shadow-sm hover:shadow-md transition-shadow"
         >
           <Plus className="w-5 h-5 mr-2" />
@@ -157,7 +157,7 @@ export default function Dashboard() {
               <p className="text-3xl font-bold text-emerald-600 tracking-tight">
                 {upcomingTasks.length}
               </p>
-              <p className="text-sm text-muted-foreground mt-1">รายการใน 30 วันถัดไป</p>
+              <p className="text-sm text-muted-foreground mt-1">รายการที่รอดำเนินการเดือนนี้</p>
             </Card>
           </div>
 
@@ -165,7 +165,7 @@ export default function Dashboard() {
           <Card className="p-6 rounded-2xl border border-slate-100 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
               <h3 className="text-base font-semibold text-foreground">
-                งานที่ต้องทำ (30 วันถัดไป)
+                งานที่ต้องทำเดือนนี้
               </h3>
               <Badge
                 variant="secondary"
@@ -229,7 +229,7 @@ export default function Dashboard() {
               สร้างแผนการปลูกข้าวเพื่อดูไทม์ไลน์ งานที่ต้องทำ และความคืบหน้าระยะของข้าว
             </p>
             <Button
-              onClick={() => navigate("/create-plan")}
+              onClick={() => navigate("/app/create-plan")}
               className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-11 px-6 shadow-sm"
             >
               <Plus className="w-5 h-5 mr-2" />

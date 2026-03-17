@@ -45,7 +45,7 @@ export default function Plots() {
             <p className="text-muted-foreground text-sm">ยังไม่มีแปลงนาในระบบ เริ่มสร้างแปลงแรกของคุณได้เลย</p>
           </div>
           <Button
-            onClick={() => navigate("/create-plan")}
+            onClick={() => navigate("/app/create-plan")}
             className="bg-emerald-600 hover:bg-emerald-700 rounded-xl h-11 px-6 text-white shadow-sm"
           >
             <Plus className="w-5 h-5 mr-2" />
@@ -61,7 +61,7 @@ export default function Plots() {
             เมื่อคุณสร้างแผนการปลูก แปลงนาจะถูกแสดงในหน้านี้
           </p>
           <Button
-            onClick={() => navigate("/create-plan")}
+            onClick={() => navigate("/app/create-plan")}
             className="bg-emerald-600 hover:bg-emerald-700 rounded-xl h-11 px-6 text-white shadow-sm"
           >
             <Plus className="w-5 h-5 mr-2" />
@@ -80,7 +80,7 @@ export default function Plots() {
           <p className="text-muted-foreground text-sm">รายการแปลงนาทั้งหมดของคุณ</p>
         </div>
         <Button
-          onClick={() => navigate("/create-plan")}
+          onClick={() => navigate("/app/create-plan")}
           className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 rounded-xl h-11 px-6 text-white shadow-sm"
         >
           <Plus className="w-5 h-5 mr-2" />

@@ -21,14 +21,6 @@ export const router = createBrowserRouter([
     Component: Login,
   },
   {
-    path: "/create-plan",
-    element: (
-      <ProtectedRoute>
-        <CreatePlan />
-      </ProtectedRoute>
-    ),
-  },
-  {
     path: "/app",
     element: (
       <ProtectedRoute>
@@ -59,6 +51,10 @@ export const router = createBrowserRouter([
       {
         path: "admin",
         element: <Admin />,
+      },
+      {
+        path: "create-plan",
+        element: <CreatePlan />,
       },
     ],
   },
