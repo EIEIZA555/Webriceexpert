@@ -36,6 +36,29 @@ interface PromptTemplate {
   created_at: string;
 }
 
+function FaqTab({ faq, faqLoading }: { faq: FaqItem[]; faqLoading: boolean }) {
+  return (
+    <div className="space-y-4">
+      <h3 className="font-medium">คำถามที่ถามบ่อย</h3>
+      {faqLoading ? (
+        <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
+      ) : faq.length === 0 ? (
+        <p className="text-sm text-muted-foreground">ยังไม่มีประวัติการสนทนา</p>
+      ) : (
+        <div className="divide-y divide-border border border-border rounded-xl overflow-hidden bg-white">
+          {faq.map((item, i) => (
+            <div key={i} className="flex items-baseline gap-4 px-5 py-3">
+              <span className="text-xs text-muted-foreground w-4 shrink-0">{i + 1}</span>
+              <p className="flex-1 text-sm">{item.question}</p>
+              <span className="text-xs text-muted-foreground shrink-0">{item.count} ครั้ง</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Admin() {
   const [activeTab, setActiveTab] = useState<Tab>("docs");
 
@@ -257,32 +280,7 @@ export default function Admin() {
 
       {/* FAQ Tab */}
       {activeTab === "faq" && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="font-medium">คำถามที่ถามบ่อย (Top 10)</h3>
-          </div>
-          {faqLoading ? (
-            <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
-          ) : faq.length === 0 ? (
-            <Card className="p-8 rounded-xl text-center text-muted-foreground text-sm">ยังไม่มีประวัติการสนทนา</Card>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {faq.map((item, i) => (
-                <Card key={i} className="p-4 rounded-xl flex flex-col gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary text-sm font-semibold shrink-0">
-                      {i + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm leading-snug">{item.question}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{item.count} ครั้ง</p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
+        <FaqTab faq={faq} faqLoading={faqLoading} />
       )}
 
       {/* Prompt Templates Tab */}
