@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Leaf, Sprout, MessageCircle, BookOpen, FileText, ExternalLink, LogIn, Bot, CalendarDays, BarChart2 } from "lucide-react";
+import { Leaf, Sprout, MessageCircle, BookOpen, FileText, ExternalLink, LogIn, Bot, CalendarDays, BarChart2, SendHorizonal } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { apiFetch, API_BASE_URL } from "../lib/api";
@@ -62,9 +62,12 @@ export default function Landing() {
     setInput("");
     setIsLoading(true);
     try {
+      const history = messages
+        .slice(-6)
+        .map((m) => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text }));
       const data = await apiFetch<ChatResponse>("/chat/", {
         method: "POST",
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question, history }),
       }, false);
       setMessages((prev) => [...prev, { id: prev.length, text: data.answer, sender: "bot" }]);
     } catch {
@@ -196,7 +199,7 @@ export default function Landing() {
 
             {/* Input */}
             <div className="p-4 border-t border-border">
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-end">
                 <input
                   type="text"
                   value={input}
@@ -204,15 +207,25 @@ export default function Landing() {
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
                   placeholder="พิมพ์คำถามเกี่ยวกับการปลูกข้าว..."
                   disabled={isLoading}
-                  className="flex-1 px-4 py-2.5 rounded-lg border border-border bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-white disabled:opacity-60"
+                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 focus:bg-white transition-colors disabled:opacity-60"
                 />
-                <Button
+                <button
+                  type="button"
                   onClick={handleSend}
                   disabled={!input.trim() || isLoading}
-                  className="bg-primary hover:bg-primary/90 rounded-lg"
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-all duration-150 ${
+                    input.trim() && !isLoading
+                      ? "bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-md hover:shadow-lg active:scale-95"
+                      : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                  }`}
+                  aria-label="ส่งข้อความ"
                 >
-                  ส่ง
-                </Button>
+                  {input.trim() ? (
+                    <SendHorizonal size={18} strokeWidth={2} />
+                  ) : (
+                    <MessageCircle size={18} strokeWidth={2} />
+                  )}
+                </button>
               </div>
               <p className="text-xs text-muted-foreground mt-2 text-center">
                 <button onClick={() => navigate("/login")} className="text-primary hover:underline">

@@ -93,9 +93,13 @@ export function FloatingChat() {
     setIsLoading(true);
 
     try {
+      const history = messages
+        .filter((m) => m.id !== 0)
+        .slice(-6)
+        .map((m) => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text }));
       const data = await apiFetch<ChatResponse>("/chat/", {
         method: "POST",
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question, history }),
       }, true);
 
       setMessages((prev) => [...prev, {
@@ -139,14 +143,14 @@ export function FloatingChat() {
       {isOpen && (
         <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[400px] sm:h-[600px] w-full h-full sm:max-h-[85vh] bg-white sm:rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden border-0 sm:border border-primary/20">
           {/* Header */}
-          <div className="bg-gradient-to-br from-emerald-600 via-green-600 to-teal-700 text-white px-4 py-3.5 flex items-center justify-between shrink-0">
+          <div className="bg-primary text-white px-4 py-3.5 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
                 <Sprout size={22} strokeWidth={2} />
               </div>
               <div className="min-w-0">
                 <h3 className="font-bold text-base truncate">AI ผู้ช่วยวิชาการข้าว</h3>
-                <p className="text-xs text-emerald-100/90 truncate">พร้อมให้คำปรึกษาจากคู่มือกรมการข้าว</p>
+                <p className="text-xs text-white/80 truncate">พร้อมให้คำปรึกษาจากคู่มือกรมการข้าว</p>
               </div>
             </div>
             <button
@@ -171,7 +175,7 @@ export function FloatingChat() {
                   <div
                     className={`max-w-[82%] rounded-2xl px-4 py-3 shadow-sm ${
                       msg.sender === "user"
-                        ? "bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-tr-md"
+                        ? "bg-primary text-white rounded-tr-md"
                         : "bg-white text-gray-800 rounded-tl-md border border-slate-100"
                     }`}
                   >
@@ -250,7 +254,7 @@ export function FloatingChat() {
                 disabled={!inputMessage.trim() || isLoading}
                 className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-all duration-150 ${
                   inputMessage.trim() && !isLoading
-                    ? "bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-md hover:shadow-lg active:scale-95"
+                    ? "bg-primary hover:bg-primary/90 text-white shadow-md hover:shadow-lg active:scale-95"
                     : "bg-slate-100 text-slate-400 cursor-not-allowed"
                 }`}
                 aria-label="ส่งข้อความ"
