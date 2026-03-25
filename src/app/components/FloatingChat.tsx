@@ -48,6 +48,7 @@ export function FloatingChat() {
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [hasSentMessage, setHasSentMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -89,6 +90,7 @@ export function FloatingChat() {
     };
     setMessages((prev) => [...prev, userMessage]);
     setInputMessage("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
     setHasSentMessage(true);
     setIsLoading(true);
 
@@ -239,14 +241,19 @@ export function FloatingChat() {
           {/* Input */}
           <div className="shrink-0 p-4 pt-3 bg-white border-t border-slate-100">
             <div className="flex gap-2 items-end">
-              <input
-                type="text"
+              <textarea
+                ref={textareaRef}
                 value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
+                onChange={(e) => {
+                  setInputMessage(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                }}
                 onKeyDown={handleKeyPress}
                 placeholder="พิมพ์คำถามเกี่ยวกับโรคข้าว..."
                 disabled={isLoading}
-                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 focus:bg-white transition-colors disabled:opacity-60"
+                rows={1}
+                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 focus:bg-white transition-colors disabled:opacity-60 resize-none overflow-y-auto"
               />
               <button
                 type="button"

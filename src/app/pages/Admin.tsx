@@ -7,6 +7,7 @@ import {
   HelpCircle,
   MessageSquare,
   Plus,
+  Sparkles,
 } from "lucide-react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -119,6 +120,11 @@ export default function Admin() {
   const [newContent, setNewContent] = useState("");
   const [promptsError, setPromptsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [suggestions, setSuggestions] = useState<{ title: string; content: string }[]>([]);
+  const [selectedSuggestions, setSelectedSuggestions] = useState<Set<number>>(new Set());
+  const [savingSuggestions, setSavingSuggestions] = useState(false);
 
   // fetch docs + collections on mount
   useEffect(() => {
@@ -201,7 +207,12 @@ export default function Admin() {
   const handleDeleteDoc = async (id: string) => {
     try {
       await apiFetch(`/documents/${id}`, { method: "DELETE" }, true);
-      setDocuments((prev) => prev.filter((d) => d.id !== id));
+      const [docs, cols] = await Promise.all([
+        apiFetch<DocumentResponse[]>("/documents/", {}, false),
+        apiFetch<CollectionItem[]>("/documents/collections", {}, false),
+      ]);
+      setDocuments(docs);
+      setCollections(cols);
     } catch (e) {
       setDocsError((e as Error).message);
     }
@@ -230,6 +241,51 @@ export default function Admin() {
       setPromptsError((e as Error).message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setSuggestions([]);
+    setSelectedSuggestions(new Set());
+    try {
+      const result = await apiFetch<{ title: string; content: string }[]>("/prompts/generate", { method: "POST" }, true);
+      setSuggestions(result);
+    } catch (e) {
+      setPromptsError((e as Error).message);
+      setGenerateDialogOpen(false);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const toggleSuggestion = (i: number) => {
+    setSelectedSuggestions((prev) => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return next;
+    });
+  };
+
+  const handleSaveSuggestions = async () => {
+    setSavingSuggestions(true);
+    try {
+      for (const i of selectedSuggestions) {
+        const q = suggestions[i];
+        const created = await apiFetch<PromptTemplate>(
+          "/prompts/",
+          { method: "POST", body: JSON.stringify({ title: q.title, content: q.content }) },
+          true,
+        );
+        setPrompts((prev) => [...prev, created]);
+      }
+      setGenerateDialogOpen(false);
+      setSuggestions([]);
+      setSelectedSuggestions(new Set());
+    } catch (e) {
+      setPromptsError((e as Error).message);
+    } finally {
+      setSavingSuggestions(false);
     }
   };
 
@@ -490,11 +546,67 @@ export default function Admin() {
             </Button>
           </Card>
 
+          {/* Generate dialog */}
+          <Dialog open={generateDialogOpen} onOpenChange={setGenerateDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Generate คำถามจาก AI</DialogTitle>
+              </DialogHeader>
+              {generating ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">กำลังสร้างคำถาม...</p>
+              ) : suggestions.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">ไม่พบคำถาม</p>
+              ) : (
+                <div className="space-y-2 py-2">
+                  <p className="text-xs text-muted-foreground mb-3">เลือกคำถามที่ต้องการบันทึกเป็น template</p>
+                  {suggestions.map((s, i) => (
+                    <label key={i} className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-accent cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedSuggestions.has(i)}
+                        onChange={() => toggleSuggestion(i)}
+                        className="mt-1 accent-primary shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{s.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{s.content}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setGenerateDialogOpen(false)}>ยกเลิก</Button>
+                {suggestions.length > 0 && (
+                  <Button
+                    className="bg-primary hover:bg-primary/90"
+                    onClick={handleSaveSuggestions}
+                    disabled={selectedSuggestions.size === 0 || savingSuggestions}
+                  >
+                    {savingSuggestions ? "กำลังบันทึก..." : `บันทึก (${selectedSuggestions.size})`}
+                  </Button>
+                )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           {/* List */}
           <div className="flex justify-between items-center">
             <h3 className="font-medium">
               Templates ทั้งหมด ({prompts.length})
             </h3>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
+              onClick={() => {
+                setGenerateDialogOpen(true);
+                handleGenerate();
+              }}
+            >
+              <Sparkles className="w-4 h-4 mr-1" />
+              Generate จาก AI
+            </Button>
           </div>
           {promptsLoading ? (
             <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
