@@ -59,10 +59,11 @@ export function FloatingChat() {
   }, [messages]);
 
   useEffect(() => {
+    if (!isOpen) return;
     apiFetch<PromptTemplate[]>("/prompts/", {}, false)
       .then(setTemplates)
       .catch(() => {});
-  }, []);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || historyLoaded || !isAuthenticated()) return;
