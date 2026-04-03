@@ -116,78 +116,7 @@ export default function Calendar() {
         </div>
       </div>
 
-      {/* Milestone view: ตามระยะหลักของพันธุ์ */}
-      {view === "milestone" && stages.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:p-6 shadow-sm mb-6">
-          <h3 className="text-sm font-semibold text-foreground mb-3">Milestone view (ตามระยะข้าว)</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
-            {stages.map((s) => {
-              const isCurrent = daysSinceStart >= s.startDay && daysSinceStart <= s.endDay;
-              const sStartISO = addDaysToISODate(plan.startDate, s.startDay);
-              const sEndISO = addDaysToISODate(plan.startDate, s.endDay);
-              const sTasks = plan.tasks.filter((t) => t.day >= s.startDay && t.day <= s.endDay);
-              return (
-                <div
-                  key={s.name}
-                  className={`p-3 rounded-xl border ${
-                    isCurrent ? "bg-emerald-50 border-emerald-200" : "bg-slate-50/40 border-slate-200"
-                  }`}
-                >
-                  <p className="text-xs text-muted-foreground">{s.startDay}–{s.endDay} DAS</p>
-                  <p className="text-sm font-semibold mt-1">{s.name}</p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {format(new Date(`${sStartISO}T00:00:00`), "d MMM")} – {format(new Date(`${sEndISO}T00:00:00`), "d MMM")}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {sTasks.length > 0 ? sTasks.map((t) => t.taskName).join(", ") : "ไม่มีงานกำหนด"}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-          {(currentStage || currentSubStage) && (
-            <p className="text-xs text-muted-foreground mt-3">
-              ระยะหลัก: {currentStage ?? "-"} • ระยะย่อย (PRD): {currentSubStage} • DAS {daysSinceStart}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Timeline static: รายการงานจาก fixed plan เรียง DAS */}
-      {view === "timeline" && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:p-6 shadow-sm mb-6">
-          <h3 className="text-sm font-semibold text-foreground mb-1">Timeline static (จาก Fixed Plan)</h3>
-          <p className="text-xs text-muted-foreground mb-4">
-            รายการงานคงที่ตามพันธุ์ — ไม่คำนวณใหม่จาก AI
-          </p>
-          <ul className="space-y-2 max-h-72 overflow-y-auto pr-1">
-            {sortedTimeline.map((t) => {
-              const done = t.isCompleted;
-              return (
-                <li
-                  key={t.id}
-                  className={`flex flex-col sm:flex-row sm:items-center sm:gap-3 p-3 rounded-xl border text-sm ${
-                    done ? "bg-slate-50 border-slate-100 opacity-80" : "bg-white border-slate-200"
-                  }`}
-                >
-                  <TaskGlyph taskName={t.taskName} className="w-4 h-4 text-emerald-700 shrink-0 sm:order-first" />
-                  <span className="text-xs font-mono text-muted-foreground shrink-0 min-w-[5.5rem]">
-                    {t.day < 0 ? `ก่อน DAS ${-t.day}` : `DAS ${t.day}`}
-                  </span>
-                  <span className="text-xs text-muted-foreground shrink-0 w-28">
-                    {format(new Date(`${t.date}T00:00:00`), "d MMM", { locale: th })}
-                  </span>
-                  <span className={`flex-1 font-medium ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                    {t.taskName}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-6 items-start mb-6">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:p-6 shadow-sm">
           <DayPicker
             mode="single"
@@ -245,6 +174,77 @@ export default function Calendar() {
           )}
         </div>
       </div>
+
+      {/* Milestone view: ตามระยะหลักของพันธุ์ */}
+      {view === "milestone" && stages.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:p-6 shadow-sm">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Milestone view (ตามระยะข้าว)</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+            {stages.map((s) => {
+              const isCurrent = daysSinceStart >= s.startDay && daysSinceStart <= s.endDay;
+              const sStartISO = addDaysToISODate(plan.startDate, s.startDay);
+              const sEndISO = addDaysToISODate(plan.startDate, s.endDay);
+              const sTasks = plan.tasks.filter((t) => t.day >= s.startDay && t.day <= s.endDay);
+              return (
+                <div
+                  key={s.name}
+                  className={`p-3 rounded-xl border ${
+                    isCurrent ? "bg-emerald-50 border-emerald-200" : "bg-slate-50/40 border-slate-200"
+                  }`}
+                >
+                  <p className="text-xs text-muted-foreground">{s.startDay}–{s.endDay} DAS</p>
+                  <p className="text-sm font-semibold mt-1">{s.name}</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {format(new Date(`${sStartISO}T00:00:00`), "d MMM")} – {format(new Date(`${sEndISO}T00:00:00`), "d MMM")}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {sTasks.length > 0 ? sTasks.map((t) => t.taskName).join(", ") : "ไม่มีงานกำหนด"}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+          {(currentStage || currentSubStage) && (
+            <p className="text-xs text-muted-foreground mt-3">
+              ระยะหลัก: {currentStage ?? "-"} • ระยะย่อย (PRD): {currentSubStage} • DAS {daysSinceStart}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Timeline static: รายการงานจาก fixed plan เรียง DAS */}
+      {view === "timeline" && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:p-6 shadow-sm">
+          <h3 className="text-sm font-semibold text-foreground mb-1">Timeline static (จาก Fixed Plan)</h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            รายการงานคงที่ตามพันธุ์ — ไม่คำนวณใหม่จาก AI
+          </p>
+          <ul className="space-y-2 max-h-72 overflow-y-auto pr-1">
+            {sortedTimeline.map((t) => {
+              const done = t.isCompleted;
+              return (
+                <li
+                  key={t.id}
+                  className={`flex flex-col sm:flex-row sm:items-center sm:gap-3 p-3 rounded-xl border text-sm ${
+                    done ? "bg-slate-50 border-slate-100 opacity-80" : "bg-white border-slate-200"
+                  }`}
+                >
+                  <TaskGlyph taskName={t.taskName} className="w-4 h-4 text-emerald-700 shrink-0 sm:order-first" />
+                  <span className="text-xs font-mono text-muted-foreground shrink-0 min-w-[5.5rem]">
+                    {t.day < 0 ? `ก่อน DAS ${-t.day}` : `DAS ${t.day}`}
+                  </span>
+                  <span className="text-xs text-muted-foreground shrink-0 w-28">
+                    {format(new Date(`${t.date}T00:00:00`), "d MMM", { locale: th })}
+                  </span>
+                  <span className={`flex-1 font-medium ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                    {t.taskName}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

@@ -74,7 +74,7 @@ export default function CreatePlan() {
     setIsLoading(true);
     setError(null);
     try {
-      const created = await createPlan({
+      await createPlan({
         varietyId: formData.variety,
         startDate: formData.plantDate,
         plotName: formData.plotName,
@@ -82,8 +82,7 @@ export default function CreatePlan() {
         soilType: formData.soilType as SoilTypeKey,
         plantingMethod: formData.plantingMethod as PlantingMethodKey,
       });
-      // After creating plan, jump directly to the individual plot dashboard.
-      navigate(`/app/plots/${created.id}`);
+      navigate("/app/plots");
     } catch (e) {
       setError((e as Error).message);
     } finally {
