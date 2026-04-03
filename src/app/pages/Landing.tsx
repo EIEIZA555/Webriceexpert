@@ -44,7 +44,7 @@ export default function Landing() {
 
   useEffect(() => {
     if (isAuthenticated()) {
-      navigate("/app/dashboard", { replace: true });
+      navigate("/app/plots", { replace: true });
     } else {
       apiFetch<DocumentResponse[]>("/documents/", {}, false).then(setDocuments).catch(() => {});
       apiFetch<PromptTemplate[]>("/prompts/", {}, false).then(setTemplates).catch(() => {});

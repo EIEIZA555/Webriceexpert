@@ -1,75 +1,22 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { apiFetch } from "../lib/api";
-import { RICE_VARIETIES, getCurrentStage } from "../lib/planGenerator";
+import { RICE_VARIETIES, SoilTypeKey, getCurrentStage } from "../lib/planGenerator";
+import { generateFixedPlanTasks } from "../lib/fixedPlan";
+import type { PlanTask, PlantingPlan } from "../lib/planTypes";
+import type { PlantingMethodKey } from "../lib/plantingMethod";
 
-export interface PlanTask {
-  id: string;
-  day: number;
-  stage: string;
-  taskName: string;
-  description: string | null;
-  date: string;
-  isCompleted: boolean;
-}
-
-export interface PlantingPlan {
-  id: string;
-  varietyId: string;
-  varietyName: string;
-  startDate: string;
-  areaRai: number;
-  plotName: string | null;
-  tasks: PlanTask[];
-  createdAt: string;
-}
-
-interface ApiTask {
-  id: string;
-  day: number;
-  stage: string;
-  task_name: string;
-  description: string | null;
-  date: string;
-  is_completed: boolean;
-}
-
-interface ApiPlan {
-  id: string;
-  variety_id: string;
-  variety_name: string;
-  start_date: string;
-  area_rai: number;
-  plot_name: string | null;
-  tasks: ApiTask[];
-  created_at: string;
-}
-
-function mapTask(t: ApiTask): PlanTask {
-  return {
-    id: t.id,
-    day: t.day,
-    stage: t.stage,
-    taskName: t.task_name,
-    description: t.description,
-    date: t.date,
-    isCompleted: t.is_completed,
-  };
-}
-
-function mapPlan(p: ApiPlan): PlantingPlan {
-  return {
-    id: p.id,
-    varietyId: p.variety_id,
-    varietyName: p.variety_name,
-    startDate: p.start_date,
-    areaRai: p.area_rai,
-    plotName: p.plot_name,
-    tasks: p.tasks.map(mapTask),
-    createdAt: p.created_at,
-  };
-}
+export type { PlanTask, PlantingPlan } from "../lib/planTypes";
+export type { PlantingMethodKey } from "../lib/plantingMethod";
 
 const CURRENT_PLAN_KEY = "rice_expert_current_plan_id";
+const PLANS_KEY = "rice_expert_plans_v1";
+
+function safeRandomId(prefix: string) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return `${prefix}_${(crypto as any).randomUUID()}`;
+  }
+  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+}
 
 interface PlansContextValue {
   plans: PlantingPlan[];
@@ -78,7 +25,14 @@ interface PlansContextValue {
   error: string | null;
   currentPlanId: string | null;
   setCurrentPlanId: (id: string) => void;
-  createPlan: (params: { varietyId: string; startDate: string; plotName: string; landSize: string }) => Promise<PlantingPlan>;
+  createPlan: (params: {
+    varietyId: string;
+    startDate: string;
+    plotName: string;
+    landSize: string;
+    soilType: SoilTypeKey;
+    plantingMethod: PlantingMethodKey;
+  }) => Promise<PlantingPlan>;
   toggleTask: (planId: string, taskId: string) => Promise<void>;
   deletePlan: (planId: string) => Promise<void>;
   getDaysSinceStart: () => number;
@@ -100,12 +54,41 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
 
   const fetchPlans = useCallback(async () => {
     try {
-      const data = await apiFetch<ApiPlan[]>("/plans/", {}, true);
-      const mapped = data.map(mapPlan);
-      setPlans(mapped);
+      const raw = localStorage.getItem(PLANS_KEY);
+      const parsed = raw ? (JSON.parse(raw) as (PlantingPlan & { plantingMethod?: PlantingMethodKey })[]) : [];
+      const neededMigrate = parsed.some((p) => !p.plantingMethod);
+      const normalized = parsed.map((p) => {
+        const soilType = p.soilType ?? "loam";
+        const plantingMethod: PlantingMethodKey = p.plantingMethod ?? "wet_seeded";
+        const hadMethod = Boolean(p.plantingMethod);
+        const completionKey = new Map(
+          p.tasks.map((t) => [`${t.day}:${t.taskName}`, t.isCompleted] as const),
+        );
+        const tasks = hadMethod
+          ? p.tasks
+          : generateFixedPlanTasks({
+              varietyId: p.varietyId,
+              startDate: p.startDate,
+              soilType,
+              plantingMethod,
+            }).map((t) => ({
+              ...t,
+              isCompleted: completionKey.get(`${t.day}:${t.taskName}`) ?? false,
+            }));
+        return {
+          ...p,
+          soilType,
+          plantingMethod,
+          tasks,
+        };
+      });
+      setPlans(normalized);
+      if (neededMigrate && normalized.length > 0) {
+        localStorage.setItem(PLANS_KEY, JSON.stringify(normalized));
+      }
       setCurrentPlanIdState((prev) => {
-        if (prev && mapped.find((p) => p.id === prev)) return prev;
-        const first = mapped[0]?.id ?? null;
+        if (prev && normalized.find((p) => p.id === prev)) return prev;
+        const first = normalized[0]?.id ?? null;
         if (first) localStorage.setItem(CURRENT_PLAN_KEY, first);
         return first;
       });
@@ -126,20 +109,38 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const createPlan = useCallback(
-    async (params: { varietyId: string; startDate: string; plotName: string; landSize: string }) => {
+    async (params: {
+      varietyId: string;
+      startDate: string;
+      plotName: string;
+      landSize: string;
+      soilType: SoilTypeKey;
+      plantingMethod: PlantingMethodKey;
+    }) => {
       const variety = RICE_VARIETIES.find((v) => v.id === params.varietyId)!;
-      const data = await apiFetch<ApiPlan>("/plans/", {
-        method: "POST",
-        body: JSON.stringify({
-          variety_id: params.varietyId,
-          variety_name: variety.name,
-          start_date: params.startDate,
-          area_rai: parseFloat(params.landSize),
-          plot_name: params.plotName,
+      const newPlan: PlantingPlan = {
+        id: safeRandomId("plan"),
+        varietyId: params.varietyId,
+        varietyName: variety.name,
+        startDate: params.startDate,
+        areaRai: parseFloat(params.landSize),
+        plotName: params.plotName || null,
+        soilType: params.soilType,
+        plantingMethod: params.plantingMethod,
+        tasks: generateFixedPlanTasks({
+          varietyId: params.varietyId,
+          startDate: params.startDate,
+          soilType: params.soilType,
+          plantingMethod: params.plantingMethod,
         }),
-      }, true);
-      const newPlan = mapPlan(data);
-      setPlans((prev) => [...prev, newPlan]);
+        createdAt: new Date().toISOString(),
+      };
+
+      setPlans((prev) => {
+        const next = [...prev, newPlan];
+        localStorage.setItem(PLANS_KEY, JSON.stringify(next));
+        return next;
+      });
       setCurrentPlanId(newPlan.id);
       return newPlan;
     },
@@ -147,25 +148,25 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
   );
 
   const toggleTask = useCallback(async (planId: string, taskId: string) => {
-    const data = await apiFetch<ApiTask>(
-      `/plans/${planId}/tasks/${taskId}/toggle`,
-      { method: "PATCH" },
-      true,
-    );
-    const updated = mapTask(data);
-    setPlans((prev) =>
-      prev.map((p) =>
-        p.id === planId
-          ? { ...p, tasks: p.tasks.map((t) => (t.id === taskId ? updated : t)) }
-          : p,
-      ),
-    );
+    setPlans((prev) => {
+      const next = prev.map((p) => {
+        if (p.id !== planId) return p;
+        return {
+          ...p,
+          tasks: p.tasks.map((t) =>
+            t.id === taskId ? { ...t, isCompleted: !t.isCompleted } : t,
+          ),
+        };
+      });
+      localStorage.setItem(PLANS_KEY, JSON.stringify(next));
+      return next;
+    });
   }, []);
 
   const deletePlan = useCallback(async (planId: string) => {
-    await apiFetch(`/plans/${planId}`, { method: "DELETE" }, true);
     setPlans((prev) => {
       const remaining = prev.filter((p) => p.id !== planId);
+      localStorage.setItem(PLANS_KEY, JSON.stringify(remaining));
       if (currentPlanId === planId) {
         const next = remaining[0]?.id ?? null;
         if (next) localStorage.setItem(CURRENT_PLAN_KEY, next);

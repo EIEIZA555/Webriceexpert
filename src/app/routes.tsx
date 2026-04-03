@@ -4,8 +4,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AppLayout } from "./components/AppLayout";
 import Login from "./pages/Login";
 import Landing from "./pages/Landing";
-import Dashboard from "./pages/Dashboard";
 import Plots from "./pages/Plots";
+import PlotDashboard from "./pages/PlotDashboard";
 import Calendar from "./pages/Calendar";
 import Admin from "./pages/Admin";
 import Knowledge from "./pages/Knowledge";
@@ -30,15 +30,15 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Navigate to="/app/dashboard" replace />,
-      },
-      {
-        path: "dashboard",
-        element: <Dashboard />,
+        element: <Navigate to="/app/plots" replace />,
       },
       {
         path: "plots",
         element: <Plots />,
+      },
+      {
+        path: "plots/:id",
+        element: <PlotDashboard />,
       },
       {
         path: "calendar",

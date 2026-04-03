@@ -18,7 +18,7 @@ export default function Login() {
 
   useEffect(() => {
     if (isAuthenticated()) {
-      navigate("/app/dashboard", { replace: true });
+      navigate("/app/plots", { replace: true });
     }
   }, [navigate]);
 
@@ -32,7 +32,7 @@ export default function Login() {
       } else {
         await login(username, password);
       }
-      navigate("/app/dashboard", { replace: true });
+      navigate("/app/plots", { replace: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : "ไม่สามารถติดต่อเซิร์ฟเวอร์ได้";
       setError(message);

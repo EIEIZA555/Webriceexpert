@@ -6,6 +6,7 @@ import { Badge } from "../components/ui/badge";
 import { Sprout, Plus, Trash2 } from "lucide-react";
 import { usePlans } from "../contexts/PlansContext";
 import { getCurrentStage, RICE_VARIETIES } from "../lib/planGenerator";
+import { getPlantingMethodLabel } from "../lib/plantingMethod";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 
@@ -15,7 +16,7 @@ export default function Plots() {
 
   const handleSelectPlan = (id: string) => {
     setCurrentPlanId(id);
-    navigate("/app/dashboard");
+    navigate(`/app/plots/${id}`);
   };
 
   const computeProgress = (startDate: string, varietyId: string) => {
@@ -88,7 +89,7 @@ export default function Plots() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {plans.map((plan) => {
           const { days, pct, total } = computeProgress(plan.startDate, plan.varietyId);
           const stage = getCurrentStage(plan.varietyId, days) ?? "เก็บเกี่ยวแล้ว";
@@ -108,7 +109,9 @@ export default function Plots() {
                     <h4 className="text-base font-semibold text-foreground">
                       {plan.plotName || "ไม่ระบุชื่อแปลง"}
                     </h4>
-                    <p className="text-xs text-muted-foreground">{plan.varietyName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {plan.varietyName} • {getPlantingMethodLabel(plan.plantingMethod)}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -133,6 +136,10 @@ export default function Plots() {
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">วันที่ปลูก</span>
                   <span>{format(new Date(plan.startDate), "d MMM yyyy", { locale: th })}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">ชนิดดิน</span>
+                  <span>{plan.soilType}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">อายุแปลง</span>

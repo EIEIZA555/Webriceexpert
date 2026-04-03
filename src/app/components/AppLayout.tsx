@@ -1,7 +1,6 @@
 import { useNavigate, useLocation, Outlet } from "react-router";
 import { clearAuth, getUsername, isAdmin, getRole } from "../lib/auth";
 import {
-  LayoutDashboard,
   Sprout,
   Calendar,
   LogOut,
@@ -16,7 +15,6 @@ import { FloatingChat } from "./FloatingChat";
 import { PlansProvider } from "../contexts/PlansContext";
 
 const navItems = [
-  { path: "/app/dashboard", label: "แดชบอร์ด", icon: LayoutDashboard, adminOnly: false },
   { path: "/app/plots", label: "แปลงนา", icon: Sprout, adminOnly: false },
   { path: "/app/calendar", label: "ปฏิทิน", icon: Calendar, adminOnly: false },
   { path: "/app/knowledge", label: "คลังความรู้", icon: BookOpen, adminOnly: false },
@@ -44,7 +42,7 @@ export function AppLayout() {
       <aside className="w-64 bg-white border-r border-border hidden lg:flex flex-col">
         <div className="p-6 border-b border-border">
           <button
-            onClick={() => navigate("/app/dashboard")}
+            onClick={() => navigate("/app/plots")}
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
             <Leaf className="w-8 h-8 text-primary" />
@@ -112,7 +110,7 @@ export function AppLayout() {
           <Menu className="w-6 h-6" />
         </button>
         <button
-          onClick={() => navigate("/app/dashboard")}
+          onClick={() => navigate("/app/plots")}
           className="flex items-center gap-2"
         >
           <Leaf className="w-6 h-6 text-primary" />

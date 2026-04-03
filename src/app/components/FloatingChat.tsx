@@ -2,13 +2,16 @@ import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Sprout, SendHorizonal } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { isAuthenticated } from "../lib/auth";
+import { usePlans } from "../contexts/PlansContext";
+import { getCurrentStage } from "../lib/planGenerator";
+import { buildRagContextPack } from "../lib/fixedPlan";
 
 const formatTime = (date: Date) =>
   date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
 
 const WELCOME_MESSAGE = {
   id: 0,
-  text: "สวัสดีครับ! ผมเป็น AI ผู้ช่วยวิชาการข้าว ยินดีให้คำปรึกษาเกี่ยวกับการปลูกข้าว โรคข้าว และการจัดการแปลงนาครับ 🌾",
+  text: "สวัสดีครับ! ผมเป็น AI ผู้ช่วยวิชาการข้าว ยินดีให้คำปรึกษาแบบใช้ได้จริง — ว่าควรทำวันไหน ทำอย่างไร ตามคู่มือครับ 🌾",
   sender: "bot" as const,
   timestamp: new Date(),
 };
@@ -40,6 +43,7 @@ interface PromptTemplate {
 }
 
 export function FloatingChat() {
+  const { plan, getDaysSinceStart, getCurrentStageName } = usePlans();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [inputMessage, setInputMessage] = useState("");
@@ -80,7 +84,26 @@ export function FloatingChat() {
   const handleSend = async () => {
     if (!inputMessage.trim() || isLoading) return;
 
-    const question = inputMessage;
+    const question = (() => {
+      if (!plan) return inputMessage;
+
+      const das = getDaysSinceStart();
+      const stage = getCurrentStageName() ?? getCurrentStage(plan.varietyId, das) ?? "ไม่ระบุระยะ";
+      const soil = plan.soilType ?? "ไม่ระบุชนิดดิน";
+
+      // PRD: fixedPlanSnapshot + fertilizerRules + activePlotId ในแพ็กเก็ตเดียว (ส่งเป็นข้อความ — API เดิมไม่เปลี่ยน)
+      const pack = buildRagContextPack(plan, das);
+      const contextPrefix =
+        `${pack}\n` +
+        `สรุปย่อสำหรับอ่านเร็ว: ${plan.plotName ?? "แปลง"} | ${plan.varietyName} | DAS ${das} | ระยะหลัก: ${stage} | ดิน: ${soil}\n` +
+        `คำสั่ง: กรุณา “อธิบายเฉพาะข้อมูลตามแต่ละระยะ” หรือ “ตอบโดยอ้างอิงจากเอกสาร PDF ในคู่มือ (RAG)” เท่านั้น ` +
+        `ห้ามคิด/แนะนำการวางแผนใหม่หรือปรับไทม์ไลน์จากเดิม\n` +
+        `รูปแบบคำตอบ: เน้นใช้ได้จริง — ระบุว่าควรทำวันไหน (อ้าง DAS/วันที่จากบริบท) และทำอย่างไรสั้น ๆ ตามคู่มือ ไม่ใช่ทฤษฎีอย่างเดียว\n\n` +
+        `คำถาม: `;
+
+      return contextPrefix + inputMessage;
+    })();
+
     const userMessage = {
       id: messages.length + 1,
       text: question,
