@@ -89,13 +89,11 @@ export function FloatingChat() {
 
       const das = getDaysSinceStart();
       const stage = getCurrentStageName() ?? getCurrentStage(plan.varietyId, das) ?? "ไม่ระบุระยะ";
-      const soil = plan.soilType ?? "ไม่ระบุชนิดดิน";
-
       // PRD: fixedPlanSnapshot + fertilizerRules + activePlotId ในแพ็กเก็ตเดียว (ส่งเป็นข้อความ — API เดิมไม่เปลี่ยน)
       const pack = buildRagContextPack(plan, das);
       const contextPrefix =
         `${pack}\n` +
-        `สรุปย่อสำหรับอ่านเร็ว: ${plan.plotName ?? "แปลง"} | ${plan.varietyName} | DAS ${das} | ระยะหลัก: ${stage} | ดิน: ${soil}\n` +
+        `สรุปย่อสำหรับอ่านเร็ว: ${plan.plotName ?? "แปลง"} | ${plan.varietyName} | DAS ${das} | ระยะหลัก: ${stage}\n` +
         `คำสั่ง: กรุณา “อธิบายเฉพาะข้อมูลตามแต่ละระยะ” หรือ “ตอบโดยอ้างอิงจากเอกสาร PDF ในคู่มือ (RAG)” เท่านั้น ` +
         `ห้ามคิด/แนะนำการวางแผนใหม่หรือปรับไทม์ไลน์จากเดิม\n` +
         `รูปแบบคำตอบ: เน้นใช้ได้จริง — ระบุว่าควรทำวันไหน (อ้าง DAS/วันที่จากบริบท) และทำอย่างไรสั้น ๆ ตามคู่มือ ไม่ใช่ทฤษฎีอย่างเดียว\n\n` +

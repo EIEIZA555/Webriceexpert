@@ -15,8 +15,7 @@ import { usePlans, type PlanTask } from "../contexts/PlansContext";
 import { motion } from "motion/react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
-import { RICE_VARIETIES, addDaysToISODate } from "../lib/planGenerator";
-import { getSubStageLabelAtDAS, listSubStagesWithDAS } from "../lib/fixedPlan";
+import { addDaysToISODate } from "../lib/planGenerator";
 import { getPlantingMethodLabel } from "../lib/plantingMethod";
 import { TaskGlyph } from "../lib/taskIcons";
 
@@ -71,15 +70,26 @@ export default function PlotDashboard() {
   const currentStage = getCurrentStageName();
   const upcomingTasks = getUpcomingTasks(30);
 
-  const stages =
-    RICE_VARIETIES.find((v) => v.id === activePlot.varietyId)?.stages ?? [];
+  // group tasks ตาม stage จาก backend
+  const stageMap = new Map<string, { startDay: number; endDay: number; tasks: PlanTask[] }>();
+  for (const t of activePlot.tasks) {
+    if (!stageMap.has(t.stage)) {
+      stageMap.set(t.stage, { startDay: t.day, endDay: t.day, tasks: [] });
+    }
+    const s = stageMap.get(t.stage)!;
+    s.startDay = Math.min(s.startDay, t.day);
+    s.endDay = Math.max(s.endDay, t.day);
+    s.tasks.push(t);
+  }
+  const stages = Array.from(stageMap.entries()).map(([name, s]) => ({ name, ...s }));
 
-  const subStages = listSubStagesWithDAS(activePlot.varietyId);
-  const currentSubLabel = getSubStageLabelAtDAS(activePlot.varietyId, daysSinceStart);
+  // แปลง daysSinceStart (นับจาก task แรก) → วันเทียบกับวันปลูก (day 0)
+  const minTaskDay = activePlot.tasks.length > 0 ? Math.min(...activePlot.tasks.map(t => t.day)) : 0;
+  const currentDayRelativeToPanting = daysSinceStart + minTaskDay;
 
-  const computeStageTasks = (startDay: number, endDay: number): PlanTask[] => {
-    return activePlot.tasks.filter((t) => t.day >= startDay && t.day <= endDay);
-  };
+  const currentSubLabel = stages.find(
+    (s) => currentDayRelativeToPanting >= s.startDay && currentDayRelativeToPanting <= s.endDay
+  )?.name ?? "-";
 
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto">
@@ -90,7 +100,7 @@ export default function PlotDashboard() {
             แดชบอร์ดแปลงนา
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {activePlot.plotName || "ไม่ระบุชื่อแปลง"} • {activePlot.varietyName} • {activePlot.soilType} •{" "}
+            {activePlot.plotName || "ไม่ระบุชื่อแปลง"} • {activePlot.varietyName} •{" "}
             {getPlantingMethodLabel(activePlot.plantingMethod)}
           </p>
         </div>
@@ -172,9 +182,9 @@ export default function PlotDashboard() {
         <Card className="p-6 rounded-2xl border border-slate-100 bg-white">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
-              <h3 className="text-base font-semibold text-foreground">Milestones ตาม DAS</h3>
+              <h3 className="text-base font-semibold text-foreground">ระยะการเจริญเติบโต</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                ช่วงวันคงที่ตามพันธุ์ (Fixed Plan)
+                ช่วงวันของแต่ละระยะตามพันธุ์
               </p>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -185,10 +195,10 @@ export default function PlotDashboard() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
             {stages.map((s) => {
-              const isCurrent = daysSinceStart >= s.startDay && daysSinceStart <= s.endDay;
+              const isCurrent = currentDayRelativeToPanting >= s.startDay && currentDayRelativeToPanting <= s.endDay;
               const sStartISO = addDaysToISODate(activePlot.startDate, s.startDay);
               const sEndISO = addDaysToISODate(activePlot.startDate, s.endDay);
-              const sTasks = computeStageTasks(s.startDay, s.endDay);
+              const sTasks = s.tasks;
 
               return (
                 <div
@@ -197,7 +207,13 @@ export default function PlotDashboard() {
                     isCurrent ? "bg-emerald-50/70 border-emerald-200" : "bg-slate-50/40 border-slate-100"
                   }`}
                 >
-                  <p className="text-xs text-muted-foreground">{s.startDay}–{s.endDay} DAS</p>
+                  <p className="text-xs text-muted-foreground">
+                    {s.startDay < 0
+                      ? `ก่อนเอาข้าวลงนา ${Math.abs(s.startDay)} วัน`
+                      : s.startDay === 0
+                      ? "วันเอาข้าวลงนา"
+                      : `หลังเอาข้าวลงนา ${s.startDay} วัน`}
+                  </p>
                   <p className="font-semibold mt-1 text-sm text-foreground">{s.name}</p>
                   <p className="text-xs text-muted-foreground mt-2">
                     {format(new Date(`${sStartISO}T00:00:00`), "d MMM yyyy", { locale: th })} –{" "}
@@ -205,41 +221,6 @@ export default function PlotDashboard() {
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">
                     งานที่กำหนด: {sTasks.length > 0 ? sTasks.map((t) => t.taskName).join(", ") : "-"}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-
-        {/* PRD: 10 ระยะย่อย (canonical) */}
-        <Card className="p-6 rounded-2xl border border-slate-100 bg-white">
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h3 className="text-base font-semibold text-foreground">ระยะย่อย (10 ช่วงตาม PRD)</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                คำนวณจาก Fixed Plan ของพันธุ์ • ตอนนี้: {currentSubLabel}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
-            {subStages.map((s) => {
-              const inRange =
-                daysSinceStart >= s.startDay && daysSinceStart <= s.endDay;
-              const startISO = addDaysToISODate(activePlot.startDate, s.startDay);
-              return (
-                <div
-                  key={s.key}
-                  className={`min-w-[140px] shrink-0 p-3 rounded-xl border text-xs ${
-                    inRange ? "bg-emerald-50 border-emerald-200" : "bg-slate-50/50 border-slate-100"
-                  }`}
-                >
-                  <p className="font-medium text-foreground leading-snug">{s.label}</p>
-                  <p className="text-muted-foreground mt-1">
-                    DAS {s.startDay}–{s.endDay}
-                  </p>
-                  <p className="text-muted-foreground mt-0.5">
-                    {format(new Date(`${startISO}T00:00:00`), "d MMM", { locale: th })}
                   </p>
                 </div>
               );
@@ -307,10 +288,10 @@ export default function PlotDashboard() {
 
         {/* Optional growth progress bar (visual) */}
         <Card className="p-6 rounded-2xl border border-slate-100 bg-white">
-          <p className="text-sm text-muted-foreground mb-2">Growth Progress</p>
+          <p className="text-sm text-muted-foreground mb-2">ความคืบหน้า</p>
           <div className="flex justify-between text-xs text-muted-foreground mb-2">
-            <span>DAS ปัจจุบัน: {daysSinceStart}</span>
-            <span>รวมทั้งสิ้น: {totalDays}</span>
+            <span>ผ่านไปแล้ว {daysSinceStart} วัน</span>
+            <span>ระยะเวลาแผนทั้งหมด {totalDays} วัน</span>
           </div>
           <Progress value={progressPercent} className="h-2" />
         </Card>

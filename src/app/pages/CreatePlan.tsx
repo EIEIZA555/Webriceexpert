@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -6,59 +6,64 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { ArrowLeft, Check, Leaf, Search } from "lucide-react";
 import { usePlans } from "../contexts/PlansContext";
-import { RICE_VARIETIES, SOIL_TYPES, type SoilTypeKey } from "../lib/planGenerator";
 import { PLANTING_METHODS, type PlantingMethodKey } from "../lib/plantingMethod";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { apiFetch } from "../lib/api";
 
-const riceVarieties = RICE_VARIETIES.map((v) => ({
-  id: v.id,
-  name: v.name,
-  description:
-    v.id === "rd43"
-      ? "Fixed plan ตัวอย่าง (DAS 0–95) — ทนแล้ง ให้ผลผลิตสูง"
-      : v.id === "jasmine"
-        ? "หอมมะลิ — วงจรประมาณ 120 วัน"
-        : v.id === "kk15"
-          ? "กข15 — อ้างอิงคู่มือ RD15 (origin correction ในแชท)"
-          : v.id === "pathumthani"
-            ? "ปทุมธานี — วงจรประมาณ 100 วัน"
-            : "ตาม Fixed Plan ในระบบ",
-}));
+interface ApiVariety {
+  id: string;
+  collection_name: string;
+  name: string;
+  harvest_age_days: number;
+  is_photoperiod_sensitive: boolean;
+  supported_methods: string[];
+  description: string;
+  reference_url: string | null;
+}
 
 export default function CreatePlan() {
   const navigate = useNavigate();
   const { createPlan } = usePlans();
   const [step, setStep] = useState(1);
+  const [varieties, setVarieties] = useState<ApiVariety[]>([]);
   const [formData, setFormData] = useState({
     variety: "",
     plantDate: "",
     landSize: "",
     plotName: "",
-    soilType: "" as SoilTypeKey | "",
     plantingMethod: "" as PlantingMethodKey | "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [varietyQuery, setVarietyQuery] = useState("");
 
+  useEffect(() => {
+    apiFetch<ApiVariety[]>("/varieties/").then(setVarieties).catch(() => {});
+  }, []);
+
+  const selectedVariety = varieties.find((v) => v.collection_name === formData.variety);
+
+  const availableMethods = selectedVariety
+    ? PLANTING_METHODS.filter((m) => selectedVariety.supported_methods.includes(m.key))
+    : PLANTING_METHODS;
+
   const filteredVarieties = useMemo(() => {
     const q = varietyQuery.trim().toLowerCase();
-    if (!q) return riceVarieties;
-    return riceVarieties.filter(
+    if (!q) return varieties;
+    return varieties.filter(
       (v) =>
         v.name.toLowerCase().includes(q) ||
         v.description.toLowerCase().includes(q) ||
-        v.id.toLowerCase().includes(q),
+        v.collection_name.toLowerCase().includes(q),
     );
-  }, [varietyQuery]);
+  }, [varietyQuery, varieties]);
 
-  /** ถ้ามีการเลือกแล้วแต่ถูก filter ซ่อน ให้โชว์การ์ดที่เลือกไว้ด้านบน */
   const displayVarieties = useMemo(() => {
-    const selected = riceVarieties.find((v) => v.id === formData.variety);
+    const selected = varieties.find((v) => v.collection_name === formData.variety);
     if (!selected) return filteredVarieties;
-    if (filteredVarieties.some((v) => v.id === selected.id)) return filteredVarieties;
+    if (filteredVarieties.some((v) => v.collection_name === selected.collection_name))
+      return filteredVarieties;
     return [selected, ...filteredVarieties];
-  }, [filteredVarieties, formData.variety]);
+  }, [filteredVarieties, formData.variety, varieties]);
 
   const handleBack = () => {
     if (step === 1) navigate("/app/plots");
@@ -79,7 +84,6 @@ export default function CreatePlan() {
         startDate: formData.plantDate,
         plotName: formData.plotName,
         landSize: formData.landSize,
-        soilType: formData.soilType as SoilTypeKey,
         plantingMethod: formData.plantingMethod as PlantingMethodKey,
       });
       navigate("/app/plots");
@@ -92,16 +96,14 @@ export default function CreatePlan() {
 
   const isStepValid = () => {
     switch (step) {
-      case 1: return formData.variety !== "";
-      case 2: return formData.plantDate !== "";
+      case 1:
+        return formData.variety !== "";
+      case 2:
+        return formData.plantDate !== "";
       case 3:
-        return (
-          formData.landSize !== "" &&
-          formData.plotName !== "" &&
-          formData.soilType !== "" &&
-          formData.plantingMethod !== ""
-        );
-      default: return false;
+        return formData.landSize !== "" && formData.plotName !== "" && formData.plantingMethod !== "";
+      default:
+        return false;
     }
   };
 
@@ -129,11 +131,19 @@ export default function CreatePlan() {
             {[1, 2, 3].map((stepNumber) => (
               <div key={stepNumber} className="flex items-center flex-1">
                 <div className="flex items-center">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${step >= stepNumber ? "bg-primary text-white" : "bg-gray-200 text-gray-500"}`}>
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                      step >= stepNumber ? "bg-primary text-white" : "bg-gray-200 text-gray-500"
+                    }`}
+                  >
                     {step > stepNumber ? <Check className="w-5 h-5" /> : <span>{stepNumber}</span>}
                   </div>
                   <div className="ml-3 hidden sm:block">
-                    <p className={`text-sm ${step >= stepNumber ? "text-foreground" : "text-muted-foreground"}`}>
+                    <p
+                      className={`text-sm ${
+                        step >= stepNumber ? "text-foreground" : "text-muted-foreground"
+                      }`}
+                    >
                       {stepNumber === 1 && "เลือกพันธุ์ข้าว"}
                       {stepNumber === 2 && "กำหนดวันปลูก"}
                       {stepNumber === 3 && "รายละเอียดแปลง"}
@@ -142,7 +152,12 @@ export default function CreatePlan() {
                 </div>
                 {stepNumber < 3 && (
                   <div className="flex-1 h-0.5 mx-4 bg-gray-200">
-                    <div className={`h-full transition-all ${step > stepNumber ? "bg-primary" : "bg-gray-200"}`} style={{ width: step > stepNumber ? "100%" : "0%" }} />
+                    <div
+                      className={`h-full transition-all ${
+                        step > stepNumber ? "bg-primary" : "bg-gray-200"
+                      }`}
+                      style={{ width: step > stepNumber ? "100%" : "0%" }}
+                    />
                   </div>
                 )}
               </div>
@@ -158,7 +173,7 @@ export default function CreatePlan() {
             <div>
               <h2 className="text-2xl mb-2">เลือกพันธุ์ข้าว</h2>
               <p className="text-muted-foreground mb-4">
-                เลือกพันธุ์ข้าวที่เหมาะสมกับพื้นที่และฤดูกาลของคุณ — รองรับรายการยาวด้วยการค้นหาและเลื่อนดู
+                เลือกพันธุ์ข้าวที่เหมาะสมกับพื้นที่และฤดูกาลของคุณ
               </p>
               <div className="relative mb-3">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -172,25 +187,31 @@ export default function CreatePlan() {
                 />
               </div>
               <p className="text-xs text-muted-foreground mb-3">
-                แสดง {displayVarieties.length} / {riceVarieties.length} พันธุ์
+                แสดง {displayVarieties.length} / {varieties.length} พันธุ์
               </p>
               <div className="max-h-[min(32rem,70vh)] overflow-y-auto overflow-x-hidden rounded-xl border border-border/60 bg-muted/20 p-3 sm:p-4 [scrollbar-gutter:stable]">
                 {displayVarieties.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-10 text-center">
-                    ไม่พบพันธุ์ที่ตรงกับคำค้น — ลองคำอื่นหรือล้างช่องค้นหา
+                    {varieties.length === 0 ? "กำลังโหลด..." : "ไม่พบพันธุ์ที่ตรงกับคำค้น"}
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                     {displayVarieties.map((variety) => (
                       <button
-                        key={variety.id}
+                        key={variety.collection_name}
                         type="button"
-                        onClick={() => setFormData({ ...formData, variety: variety.id })}
-                        className={`min-h-[5.5rem] p-4 rounded-xl border-2 text-left transition-all hover:border-primary/50 ${formData.variety === variety.id ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border bg-background/80"}`}
+                        onClick={() =>
+                          setFormData({ ...formData, variety: variety.collection_name, plantingMethod: "" })
+                        }
+                        className={`min-h-[5.5rem] p-4 rounded-xl border-2 text-left transition-all hover:border-primary/50 ${
+                          formData.variety === variety.collection_name
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                            : "border-border bg-background/80"
+                        }`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                           <h3 className="text-base font-medium leading-snug">{variety.name}</h3>
-                          {formData.variety === variety.id && (
+                          {formData.variety === variety.collection_name && (
                             <div className="w-6 h-6 shrink-0 rounded-full bg-primary flex items-center justify-center">
                               <Check className="w-4 h-4 text-white" />
                             </div>
@@ -198,6 +219,10 @@ export default function CreatePlan() {
                         </div>
                         <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed line-clamp-3">
                           {variety.description}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          อายุเก็บเกี่ยว {variety.harvest_age_days} วัน
+                          {variety.is_photoperiod_sensitive ? " • ไวแสง (นาปีเท่านั้น)" : ""}
                         </p>
                       </button>
                     ))}
@@ -209,12 +234,14 @@ export default function CreatePlan() {
 
           {step === 2 && (
             <div>
-              <h2 className="text-2xl mb-2">วันที่เริ่มนับ DAS 0</h2>
+              <h2 className="text-2xl mb-2">วันที่เริ่มปลูก</h2>
               <p className="text-muted-foreground mb-6">
-                เลือกตามจุดอ้างอิงของแปลง — เช่น วันปักดำ วันหว่านน้ำตม หรือวันหว่าน/หยอด (จะสอดคล้องกับวิธีปลูกที่เลือกในขั้นถัดไป)
+                เลือกวันที่ปลูกจริง — เช่น วันปักดำ วันหว่าน หรือวันโยนกล้า
               </p>
               <div className="max-w-md">
-                <Label htmlFor="plantDate" className="mb-2 block">วันที่อ้างอิง (DAS 0)</Label>
+                <Label htmlFor="plantDate" className="mb-2 block">
+                  วันที่ปลูก
+                </Label>
                 <Input
                   id="plantDate"
                   type="date"
@@ -222,7 +249,9 @@ export default function CreatePlan() {
                   onChange={(e) => setFormData({ ...formData, plantDate: e.target.value })}
                   className="rounded-lg bg-input-background border-border h-12"
                 />
-                <p className="text-sm text-muted-foreground mt-2">ระบบจะคำนวณแผนการดูแลตามวันที่คุณเลือก</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  ระบบจะคำนวณแผนการดูแลตามวันที่คุณเลือก
+                </p>
               </div>
             </div>
           )}
@@ -233,7 +262,9 @@ export default function CreatePlan() {
               <p className="text-muted-foreground mb-6">กรอกข้อมูลเกี่ยวกับแปลงนาของคุณ</p>
               <div className="max-w-md space-y-6">
                 <div>
-                  <Label htmlFor="plotName" className="mb-2 block">ชื่อแปลงนา</Label>
+                  <Label htmlFor="plotName" className="mb-2 block">
+                    ชื่อแปลงนา
+                  </Label>
                   <Input
                     id="plotName"
                     type="text"
@@ -244,7 +275,9 @@ export default function CreatePlan() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="landSize" className="mb-2 block">ขนาดพื้นที่ (ไร่)</Label>
+                  <Label htmlFor="landSize" className="mb-2 block">
+                    ขนาดพื้นที่ (ไร่)
+                  </Label>
                   <Input
                     id="landSize"
                     type="number"
@@ -257,37 +290,22 @@ export default function CreatePlan() {
                 </div>
 
                 <div>
-                  <Label htmlFor="soilType" className="mb-2 block">ชนิดดินตามมาตรฐานกรมการข้าว</Label>
-                  <Select
-                    value={formData.soilType}
-                    onValueChange={(v) => setFormData({ ...formData, soilType: v as SoilTypeKey })}
-                  >
-                    <SelectTrigger className="w-full rounded-lg bg-input-background border-border h-12">
-                      <SelectValue placeholder="เลือกชนิดดิน" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SOIL_TYPES.map((s) => (
-                        <SelectItem key={s.key} value={s.key}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="mb-3 block">วิธีการปลูก (กำหนดงานในไทม์ไลน์)</Label>
-                  <span className="text-xs text-muted-foreground block mb-2">
-                    DAS 0 = วันที่คุณเลือกในขั้นตอนก่อนหน้า — ตามประเภทนาด้านล่าง
-                  </span>
+                  <Label className="mb-3 block">วิธีการปลูก</Label>
+                  {selectedVariety && (
+                    <p className="text-xs text-muted-foreground mb-2">
+                      พันธุ์ที่เลือกรองรับ: {availableMethods.map((m) => m.label).join(", ")}
+                    </p>
+                  )}
                   <div className="grid grid-cols-1 gap-3">
-                    {PLANTING_METHODS.map((m) => (
+                    {availableMethods.map((m) => (
                       <button
                         key={m.key}
                         type="button"
                         onClick={() => setFormData({ ...formData, plantingMethod: m.key })}
                         className={`p-4 rounded-xl border-2 text-left transition-all hover:border-primary/50 ${
-                          formData.plantingMethod === m.key ? "border-primary bg-primary/5" : "border-border"
+                          formData.plantingMethod === m.key
+                            ? "border-primary bg-primary/5"
+                            : "border-border"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -307,11 +325,11 @@ export default function CreatePlan() {
                 <div className="bg-accent/50 p-4 rounded-lg">
                   <h4 className="text-sm mb-2">สรุปแผนของคุณ</h4>
                   <div className="text-sm space-y-1 text-muted-foreground">
-                    <p>• พันธุ์ข้าว: {riceVarieties.find((v) => v.id === formData.variety)?.name}</p>
+                    <p>• พันธุ์ข้าว: {selectedVariety?.name ?? "-"}</p>
+                    <p>• อายุเก็บเกี่ยว: {selectedVariety?.harvest_age_days ?? "-"} วัน</p>
                     <p>• วันที่ปลูก: {formData.plantDate}</p>
                     <p>• ชื่อแปลง: {formData.plotName || "-"}</p>
                     <p>• ขนาดพื้นที่: {formData.landSize || "-"} ไร่</p>
-                    <p>• ชนิดดิน: {SOIL_TYPES.find((s) => s.key === formData.soilType)?.label ?? "-"}</p>
                     <p>
                       • วิธีปลูก:{" "}
                       {PLANTING_METHODS.find((m) => m.key === formData.plantingMethod)?.label ?? "-"}
@@ -323,7 +341,12 @@ export default function CreatePlan() {
           )}
 
           <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-border">
-            <Button variant="outline" onClick={handleBack} className="rounded-lg" disabled={isLoading}>
+            <Button
+              variant="outline"
+              onClick={handleBack}
+              className="rounded-lg"
+              disabled={isLoading}
+            >
               {step === 1 ? "ยกเลิก" : "ย้อนกลับ"}
             </Button>
             <Button

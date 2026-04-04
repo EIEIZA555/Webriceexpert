@@ -1,28 +1,24 @@
-export type PlantingMethodKey = "transplanting" | "wet_seeded" | "dry_seeded";
+export type PlantingMethodKey = "transplant" | "broadcast" | "throw";
 
 export const PLANTING_METHODS: Array<{
   key: PlantingMethodKey;
   label: string;
   description: string;
-  dasZeroMeaning: string;
 }> = [
   {
-    key: "transplanting",
-    label: "นาปักดำ",
-    description: "เพาะกล้าแล้วนำไปปักในแปลง — DAS 0 = วันปักดำ",
-    dasZeroMeaning: "วันที่ปักดำ (เริ่มนับวันต้นในแปลงนา)",
+    key: "transplant",
+    label: "นาดำ",
+    description: "เพาะกล้า 25 วัน แล้วปักดำลงแปลง",
   },
   {
-    key: "wet_seeded",
-    label: "นาหว่านน้ำตม",
-    description: "ทำเทือกแล้วหว่านในนา — DAS 0 = วันหว่านเมล็ดลงนา",
-    dasZeroMeaning: "วันที่หว่านเมล็ดลงนา (น้ำตม)",
+    key: "broadcast",
+    label: "นาหว่าน",
+    description: "หว่านเมล็ดงอกลงนาโดยตรง",
   },
   {
-    key: "dry_seeded",
-    label: "นาหว่านแห้ง / หยอด",
-    description: "เตรียมดินแห้งแล้วหว่านหรือหยอด — DAS 0 = วันหว่าน/หยอด",
-    dasZeroMeaning: "วันที่หว่านหรือหยอดเมล็ด",
+    key: "throw",
+    label: "นาโยน",
+    description: "เพาะกล้าในถาด 15 วัน แล้วโยนลงแปลง",
   },
 ];
 

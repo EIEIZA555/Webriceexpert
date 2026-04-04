@@ -1,4 +1,3 @@
-import type { SoilTypeKey } from "./planGenerator";
 import type { PlantingMethodKey } from "./plantingMethod";
 
 export interface PlanTask {
@@ -18,8 +17,6 @@ export interface PlantingPlan {
   startDate: string;
   areaRai: number;
   plotName: string | null;
-  soilType: SoilTypeKey;
-  /** วิธีปลูก — กำหนดงานก่อน/หลัง DAS 0 และความหมายของวันเริ่มนับ */
   plantingMethod: PlantingMethodKey;
   tasks: PlanTask[];
   createdAt: string;

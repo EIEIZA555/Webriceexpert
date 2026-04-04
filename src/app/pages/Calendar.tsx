@@ -97,7 +97,7 @@ export default function Calendar() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <p className="text-sm text-foreground">
             <span className="font-medium">{plan.plotName || "ไม่ระบุชื่อแปลง"}</span>
-            {" "}• {plan.varietyName} • {plan.soilType}
+            {" "}• {plan.varietyName}
           </p>
           <ToggleGroup
             type="single"
@@ -192,7 +192,7 @@ export default function Calendar() {
                     isCurrent ? "bg-emerald-50 border-emerald-200" : "bg-slate-50/40 border-slate-200"
                   }`}
                 >
-                  <p className="text-xs text-muted-foreground">{s.startDay}–{s.endDay} DAS</p>
+                  <p className="text-xs text-muted-foreground">วันที่ {s.startDay}–{s.endDay}</p>
                   <p className="text-sm font-semibold mt-1">{s.name}</p>
                   <p className="text-xs text-muted-foreground mt-2">
                     {format(new Date(`${sStartISO}T00:00:00`), "d MMM")} – {format(new Date(`${sEndISO}T00:00:00`), "d MMM")}
@@ -206,7 +206,7 @@ export default function Calendar() {
           </div>
           {(currentStage || currentSubStage) && (
             <p className="text-xs text-muted-foreground mt-3">
-              ระยะหลัก: {currentStage ?? "-"} • ระยะย่อย (PRD): {currentSubStage} • DAS {daysSinceStart}
+              ระยะหลัก: {currentStage ?? "-"} • ระยะย่อย: {currentSubStage} • วันที่ {daysSinceStart}
             </p>
           )}
         </div>
@@ -230,11 +230,8 @@ export default function Calendar() {
                   }`}
                 >
                   <TaskGlyph taskName={t.taskName} className="w-4 h-4 text-emerald-700 shrink-0 sm:order-first" />
-                  <span className="text-xs font-mono text-muted-foreground shrink-0 min-w-[5.5rem]">
-                    {t.day < 0 ? `ก่อน DAS ${-t.day}` : `DAS ${t.day}`}
-                  </span>
-                  <span className="text-xs text-muted-foreground shrink-0 w-28">
-                    {format(new Date(`${t.date}T00:00:00`), "d MMM", { locale: th })}
+                  <span className="text-xs text-muted-foreground shrink-0 w-20">
+                    {format(new Date(`${t.date}T00:00:00`), "d MMM yyyy", { locale: th })}
                   </span>
                   <span className={`flex-1 font-medium ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>
                     {t.taskName}

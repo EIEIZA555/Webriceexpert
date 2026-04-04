@@ -138,10 +138,6 @@ export default function Plots() {
                   <span>{format(new Date(plan.startDate), "d MMM yyyy", { locale: th })}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">ชนิดดิน</span>
-                  <span>{plan.soilType}</span>
-                </div>
-                <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">อายุแปลง</span>
                   <span>{days} วัน จาก {total} วัน</span>
                 </div>

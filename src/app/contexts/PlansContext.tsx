@@ -1,21 +1,72 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { RICE_VARIETIES, SoilTypeKey, getCurrentStage } from "../lib/planGenerator";
-import { generateFixedPlanTasks } from "../lib/fixedPlan";
+import { getCurrentStage, RICE_VARIETIES } from "../lib/planGenerator";
 import type { PlanTask, PlantingPlan } from "../lib/planTypes";
 import type { PlantingMethodKey } from "../lib/plantingMethod";
+import { apiFetch, getAuthToken } from "../lib/api";
 
 export type { PlanTask, PlantingPlan } from "../lib/planTypes";
 export type { PlantingMethodKey } from "../lib/plantingMethod";
 
 const CURRENT_PLAN_KEY = "rice_expert_current_plan_id";
-const PLANS_KEY = "rice_expert_plans_v1";
 
-function safeRandomId(prefix: string) {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return `${prefix}_${(crypto as any).randomUUID()}`;
-  }
-  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+// Backend response types (snake_case)
+interface BackendTask {
+  id: string;
+  day: number;
+  stage: string;
+  task_name: string;
+  description: string | null;
+  date: string;
+  is_completed: boolean;
+}
+
+interface BackendPlan {
+  id: string;
+  variety_id: string;
+  variety_name: string;
+  start_date: string;
+  area_rai: number;
+  plot_name: string | null;
+  planting_method: string;
+  tasks: BackendTask[];
+  created_at: string;
+}
+
+interface BackendVariety {
+  id: string;
+  collection_name: string;
+  name: string;
+  harvest_age_days: number;
+  is_photoperiod_sensitive: boolean;
+  supported_methods: string[];
+  description: string;
+  reference_url: string | null;
+}
+
+function mapTask(t: BackendTask): PlanTask {
+  return {
+    id: t.id,
+    day: t.day,
+    stage: t.stage,
+    taskName: t.task_name,
+    description: t.description,
+    date: t.date,
+    isCompleted: t.is_completed,
+  };
+}
+
+function mapPlan(p: BackendPlan, uuidToCollection: Map<string, string>): PlantingPlan {
+  return {
+    id: p.id,
+    varietyId: uuidToCollection.get(p.variety_id) ?? p.variety_id,
+    varietyName: p.variety_name,
+    startDate: p.start_date,
+    areaRai: p.area_rai,
+    plotName: p.plot_name,
+    plantingMethod: p.planting_method as PlantingMethodKey,
+    tasks: p.tasks.map(mapTask),
+    createdAt: p.created_at,
+  };
 }
 
 interface PlansContextValue {
@@ -30,7 +81,6 @@ interface PlansContextValue {
     startDate: string;
     plotName: string;
     landSize: string;
-    soilType: SoilTypeKey;
     plantingMethod: PlantingMethodKey;
   }) => Promise<PlantingPlan>;
   toggleTask: (planId: string, taskId: string) => Promise<void>;
@@ -46,6 +96,8 @@ const PlansContext = createContext<PlansContextValue | null>(null);
 
 export function PlansProvider({ children }: { children: React.ReactNode }) {
   const [plans, setPlans] = useState<PlantingPlan[]>([]);
+  const [uuidToCollection, setUuidToCollection] = useState<Map<string, string>>(new Map());
+  const [collectionToUUID, setCollectionToUUID] = useState<Map<string, string>>(new Map());
   const [currentPlanId, setCurrentPlanIdState] = useState<string | null>(
     () => localStorage.getItem(CURRENT_PLAN_KEY),
   );
@@ -53,43 +105,31 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchPlans = useCallback(async () => {
+    if (!getAuthToken()) {
+      setPlans([]);
+      setLoading(false);
+      return;
+    }
     try {
-      const raw = localStorage.getItem(PLANS_KEY);
-      const parsed = raw ? (JSON.parse(raw) as (PlantingPlan & { plantingMethod?: PlantingMethodKey })[]) : [];
-      const neededMigrate = parsed.some((p) => !p.plantingMethod);
-      const normalized = parsed.map((p) => {
-        const soilType = p.soilType ?? "loam";
-        const plantingMethod: PlantingMethodKey = p.plantingMethod ?? "wet_seeded";
-        const hadMethod = Boolean(p.plantingMethod);
-        const completionKey = new Map(
-          p.tasks.map((t) => [`${t.day}:${t.taskName}`, t.isCompleted] as const),
-        );
-        const tasks = hadMethod
-          ? p.tasks
-          : generateFixedPlanTasks({
-              varietyId: p.varietyId,
-              startDate: p.startDate,
-              soilType,
-              plantingMethod,
-            }).map((t) => ({
-              ...t,
-              isCompleted: completionKey.get(`${t.day}:${t.taskName}`) ?? false,
-            }));
-        return {
-          ...p,
-          soilType,
-          plantingMethod,
-          tasks,
-        };
+      const varieties = await apiFetch<BackendVariety[]>("/varieties/");
+      const uuidMap = new Map<string, string>();
+      const colMap = new Map<string, string>();
+      varieties.forEach((v) => {
+        uuidMap.set(v.id, v.collection_name);
+        colMap.set(v.collection_name, v.id);
       });
-      setPlans(normalized);
-      if (neededMigrate && normalized.length > 0) {
-        localStorage.setItem(PLANS_KEY, JSON.stringify(normalized));
-      }
+      setUuidToCollection(uuidMap);
+      setCollectionToUUID(colMap);
+
+      const backendPlans = await apiFetch<BackendPlan[]>("/plans/", {}, true);
+      const mapped = backendPlans.map((p) => mapPlan(p, uuidMap));
+      setPlans(mapped);
+
       setCurrentPlanIdState((prev) => {
-        if (prev && normalized.find((p) => p.id === prev)) return prev;
-        const first = normalized[0]?.id ?? null;
+        if (prev && mapped.find((p) => p.id === prev)) return prev;
+        const first = mapped[0]?.id ?? null;
         if (first) localStorage.setItem(CURRENT_PLAN_KEY, first);
+        else localStorage.removeItem(CURRENT_PLAN_KEY);
         return first;
       });
     } catch (e) {
@@ -114,83 +154,96 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
       startDate: string;
       plotName: string;
       landSize: string;
-      soilType: SoilTypeKey;
       plantingMethod: PlantingMethodKey;
     }) => {
-      const variety = RICE_VARIETIES.find((v) => v.id === params.varietyId)!;
-      const newPlan: PlantingPlan = {
-        id: safeRandomId("plan"),
-        varietyId: params.varietyId,
-        varietyName: variety.name,
-        startDate: params.startDate,
-        areaRai: parseFloat(params.landSize),
-        plotName: params.plotName || null,
-        soilType: params.soilType,
-        plantingMethod: params.plantingMethod,
-        tasks: generateFixedPlanTasks({
-          varietyId: params.varietyId,
-          startDate: params.startDate,
-          soilType: params.soilType,
-          plantingMethod: params.plantingMethod,
-        }),
-        createdAt: new Date().toISOString(),
-      };
+      const varietyUUID = collectionToUUID.get(params.varietyId);
+      if (!varietyUUID) throw new Error(`ไม่พบพันธุ์ข้าว: ${params.varietyId}`);
 
-      setPlans((prev) => {
-        const next = [...prev, newPlan];
-        localStorage.setItem(PLANS_KEY, JSON.stringify(next));
-        return next;
-      });
+      // แปลงวันเริ่มต้นที่ user เลือก → วันปลูกจริง (day 0)
+      // เพราะ task แรกเริ่มก่อนวันปลูก (เช่น เตรียมกล้า 25 วันก่อนปักดำ)
+      const firstTaskOffset: Record<PlantingMethodKey, number> = {
+        transplant: 25,
+        broadcast: 7,
+        throw: 15,
+      };
+      const offset = firstTaskOffset[params.plantingMethod];
+      const [y, m, d] = params.startDate.split("-").map(Number);
+      const plantingDate = new Date(y, m - 1, d + offset);
+      const plantingDateStr = `${plantingDate.getFullYear()}-${String(plantingDate.getMonth() + 1).padStart(2, "0")}-${String(plantingDate.getDate()).padStart(2, "0")}`;
+
+      const backendPlan = await apiFetch<BackendPlan>(
+        "/plans/",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            variety_id: varietyUUID,
+            start_date: plantingDateStr,
+            area_rai: parseFloat(params.landSize),
+            plot_name: params.plotName || null,
+            planting_method: params.plantingMethod,
+          }),
+        },
+        true,
+      );
+
+      const newPlan = mapPlan(backendPlan, uuidToCollection);
+      setPlans((prev) => [...prev, newPlan]);
       setCurrentPlanId(newPlan.id);
       return newPlan;
     },
-    [setCurrentPlanId],
+    [collectionToUUID, uuidToCollection, setCurrentPlanId],
   );
 
   const toggleTask = useCallback(async (planId: string, taskId: string) => {
-    setPlans((prev) => {
-      const next = prev.map((p) => {
+    const updated = await apiFetch<BackendTask>(
+      `/plans/${planId}/tasks/${taskId}/toggle`,
+      { method: "PATCH" },
+      true,
+    );
+    setPlans((prev) =>
+      prev.map((p) => {
         if (p.id !== planId) return p;
-        return {
-          ...p,
-          tasks: p.tasks.map((t) =>
-            t.id === taskId ? { ...t, isCompleted: !t.isCompleted } : t,
-          ),
-        };
-      });
-      localStorage.setItem(PLANS_KEY, JSON.stringify(next));
-      return next;
-    });
+        return { ...p, tasks: p.tasks.map((t) => (t.id === taskId ? mapTask(updated) : t)) };
+      }),
+    );
   }, []);
 
-  const deletePlan = useCallback(async (planId: string) => {
-    setPlans((prev) => {
-      const remaining = prev.filter((p) => p.id !== planId);
-      localStorage.setItem(PLANS_KEY, JSON.stringify(remaining));
-      if (currentPlanId === planId) {
-        const next = remaining[0]?.id ?? null;
-        if (next) localStorage.setItem(CURRENT_PLAN_KEY, next);
-        else localStorage.removeItem(CURRENT_PLAN_KEY);
-        setCurrentPlanIdState(next);
-      }
-      return remaining;
-    });
-  }, [currentPlanId]);
+  const deletePlan = useCallback(
+    async (planId: string) => {
+      await apiFetch<void>(`/plans/${planId}`, { method: "DELETE" }, true);
+      setPlans((prev) => {
+        const remaining = prev.filter((p) => p.id !== planId);
+        if (currentPlanId === planId) {
+          const next = remaining[0]?.id ?? null;
+          if (next) localStorage.setItem(CURRENT_PLAN_KEY, next);
+          else localStorage.removeItem(CURRENT_PLAN_KEY);
+          setCurrentPlanIdState(next);
+        }
+        return remaining;
+      });
+    },
+    [currentPlanId],
+  );
 
   const plan = plans.find((p) => p.id === currentPlanId) ?? null;
 
   const getDaysSinceStart = () => {
-    if (!plan) return 0;
-    const start = new Date(plan.startDate);
-    start.setHours(0, 0, 0, 0);
+    if (!plan || plan.tasks.length === 0) return 0;
+    // นับจาก task แรกสุด (อาจเป็นวันก่อนปลูก เช่น เตรียมกล้า)
+    const firstTaskDate = plan.tasks.reduce((min, t) =>
+      t.date < min ? t.date : min, plan.tasks[0].date
+    );
+    const start = new Date(`${firstTaskDate}T00:00:00`);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return Math.max(0, Math.floor((today.getTime() - start.getTime()) / 86400000));
   };
 
   const getTotalDays = () => {
-    if (!plan) return 0;
-    return RICE_VARIETIES.find((v) => v.id === plan.varietyId)?.lifecycleDays ?? 120;
+    if (!plan || plan.tasks.length === 0) return 0;
+    const minDay = Math.min(...plan.tasks.map((t) => t.day));
+    const maxDay = Math.max(...plan.tasks.map((t) => t.day));
+    return maxDay - minDay;
   };
 
   const getProgressPercent = () => {
@@ -220,12 +273,24 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <PlansContext.Provider value={{
-      plans, plan, loading, error, currentPlanId,
-      setCurrentPlanId, createPlan, toggleTask, deletePlan,
-      getDaysSinceStart, getTotalDays, getProgressPercent,
-      getCurrentStageName, getUpcomingTasks,
-    }}>
+    <PlansContext.Provider
+      value={{
+        plans,
+        plan,
+        loading,
+        error,
+        currentPlanId,
+        setCurrentPlanId,
+        createPlan,
+        toggleTask,
+        deletePlan,
+        getDaysSinceStart,
+        getTotalDays,
+        getProgressPercent,
+        getCurrentStageName,
+        getUpcomingTasks,
+      }}
+    >
       {children}
     </PlansContext.Provider>
   );
