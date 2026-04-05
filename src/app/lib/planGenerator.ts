@@ -35,6 +35,7 @@ export function addDaysToISODate(dateISO: string, dayOffset: number): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/** ค่าเริ่มต้นจากโค้ด — runtime ใช้รายการจาก VarietiesContext / localStorage เป็นหลัก */
 export const RICE_VARIETIES: RiceVarietyConfig[] = [
   {
     id: "jasmine",
@@ -87,8 +88,9 @@ export const RICE_VARIETIES: RiceVarietyConfig[] = [
 export function getCurrentStage(
   varietyId: string,
   daysSinceStart: number,
+  varietyList: RiceVarietyConfig[] = RICE_VARIETIES,
 ): string | null {
-  const variety = RICE_VARIETIES.find((v) => v.id === varietyId);
+  const variety = varietyList.find((v) => v.id === varietyId);
   if (!variety) return null;
   for (const stage of variety.stages) {
     if (daysSinceStart >= stage.startDay && daysSinceStart <= stage.endDay) {
@@ -98,8 +100,12 @@ export function getCurrentStage(
   return null;
 }
 
-export function getStageByDay(varietyId: string, day: number): string | null {
-  return getCurrentStage(varietyId, day);
+export function getStageByDay(
+  varietyId: string,
+  day: number,
+  varietyList: RiceVarietyConfig[] = RICE_VARIETIES,
+): string | null {
+  return getCurrentStage(varietyId, day, varietyList);
 }
 
 export function getRD43FertilizerDescription(soilType: SoilTypeKey, round: 1 | 2): string {

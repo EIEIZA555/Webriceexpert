@@ -1,4 +1,5 @@
 import type { PlantingMethodKey } from "./plantingMethod";
+import type { SoilTypeKey } from "./planGenerator";
 
 export interface PlanTask {
   id: string;
@@ -20,4 +21,6 @@ export interface PlantingPlan {
   plantingMethod: PlantingMethodKey;
   tasks: PlanTask[];
   createdAt: string;
+  /** ถ้ามีจาก backend — ใช้ใน RAG context */
+  soilType?: SoilTypeKey;
 }

@@ -5,28 +5,21 @@ import { Progress } from "../components/ui/progress";
 import { Badge } from "../components/ui/badge";
 import { Sprout, Plus, Trash2 } from "lucide-react";
 import { usePlans } from "../contexts/PlansContext";
-import { getCurrentStage, RICE_VARIETIES } from "../lib/planGenerator";
+import { getCurrentStage } from "../lib/planGenerator";
+import { computeHybridSchedule, getCurrentStageHybrid } from "../lib/hybridSchedule";
+import { useVarieties } from "../contexts/VarietiesContext";
 import { getPlantingMethodLabel } from "../lib/plantingMethod";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 
 export default function Plots() {
   const navigate = useNavigate();
+  const { varietyConfigs, getRecord } = useVarieties();
   const { plans, loading, setCurrentPlanId, deletePlan } = usePlans();
 
   const handleSelectPlan = (id: string) => {
     setCurrentPlanId(id);
     navigate(`/app/plots/${id}`);
-  };
-
-  const computeProgress = (startDate: string, varietyId: string) => {
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const diff = Math.floor((today.getTime() - start.getTime()) / 86400000);
-    const total = RICE_VARIETIES.find((v) => v.id === varietyId)?.lifecycleDays ?? 120;
-    return { days: Math.max(0, diff), pct: Math.min(100, Math.max(0, (diff / total) * 100)), total };
   };
 
   if (loading) {
@@ -91,8 +84,14 @@ export default function Plots() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {plans.map((plan) => {
-          const { days, pct, total } = computeProgress(plan.startDate, plan.varietyId);
-          const stage = getCurrentStage(plan.varietyId, days) ?? "เก็บเกี่ยวแล้ว";
+          const rec = getRecord(plan.varietyId);
+          const hybrid = computeHybridSchedule(plan, rec, varietyConfigs);
+          const pct = hybrid.progressPercent;
+          const stage =
+            (rec?.scheduleMode === "FIXED_DATE"
+              ? getCurrentStageHybrid(plan, rec, hybrid.daysSincePlant, varietyConfigs)
+              : getCurrentStage(plan.varietyId, hybrid.daysSincePlant, varietyConfigs)) ??
+            "เก็บเกี่ยวแล้ว";
 
           return (
             <Card
@@ -138,8 +137,8 @@ export default function Plots() {
                   <span>{format(new Date(plan.startDate), "d MMM yyyy", { locale: th })}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">อายุแปลง</span>
-                  <span>{days} วัน จาก {total} วัน</span>
+                  <span className="text-muted-foreground">สถานะรอบการผลิต</span>
+                  <span className="text-right max-w-[14rem] leading-snug">{hybrid.plotSummaryLine}</span>
                 </div>
                 <div>
                   <div className="flex justify-between text-xs mb-1">

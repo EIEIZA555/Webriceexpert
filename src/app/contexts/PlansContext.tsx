@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { getCurrentStage, RICE_VARIETIES } from "../lib/planGenerator";
+import { getCurrentStage } from "../lib/planGenerator";
+import { useVarieties } from "./VarietiesContext";
 import type { PlanTask, PlantingPlan } from "../lib/planTypes";
-import type { PlantingMethodKey } from "../lib/plantingMethod";
+import { PLANTING_DAY_OFFSET_FROM_PLAN_START, type PlantingMethodKey } from "../lib/plantingMethod";
 import { apiFetch, getAuthToken } from "../lib/api";
 
 export type { PlanTask, PlantingPlan } from "../lib/planTypes";
@@ -90,11 +91,14 @@ interface PlansContextValue {
   getProgressPercent: () => number;
   getCurrentStageName: () => string | null;
   getUpcomingTasks: (daysAhead?: number) => PlanTask[];
+  /** มีพันธุ์นี้ใน backend (สร้างแผนได้) */
+  isVarietyRegisteredOnBackend: (collectionName: string) => boolean;
 }
 
 const PlansContext = createContext<PlansContextValue | null>(null);
 
 export function PlansProvider({ children }: { children: React.ReactNode }) {
+  const { varietyConfigs } = useVarieties();
   const [plans, setPlans] = useState<PlantingPlan[]>([]);
   const [uuidToCollection, setUuidToCollection] = useState<Map<string, string>>(new Map());
   const [collectionToUUID, setCollectionToUUID] = useState<Map<string, string>>(new Map());
@@ -161,12 +165,7 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
 
       // แปลงวันเริ่มต้นที่ user เลือก → วันปลูกจริง (day 0)
       // เพราะ task แรกเริ่มก่อนวันปลูก (เช่น เตรียมกล้า 25 วันก่อนปักดำ)
-      const firstTaskOffset: Record<PlantingMethodKey, number> = {
-        transplant: 25,
-        broadcast: 7,
-        throw: 15,
-      };
-      const offset = firstTaskOffset[params.plantingMethod];
+      const offset = PLANTING_DAY_OFFSET_FROM_PLAN_START[params.plantingMethod];
       const [y, m, d] = params.startDate.split("-").map(Number);
       const plantingDate = new Date(y, m - 1, d + offset);
       const plantingDateStr = `${plantingDate.getFullYear()}-${String(plantingDate.getMonth() + 1).padStart(2, "0")}-${String(plantingDate.getDate()).padStart(2, "0")}`;
@@ -254,8 +253,15 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
 
   const getCurrentStageName = () => {
     if (!plan) return null;
-    return getCurrentStage(plan.varietyId, getDaysSinceStart()) ?? "เก็บเกี่ยวแล้ว";
+    return (
+      getCurrentStage(plan.varietyId, getDaysSinceStart(), varietyConfigs) ?? "เก็บเกี่ยวแล้ว"
+    );
   };
+
+  const isVarietyRegisteredOnBackend = useCallback(
+    (collectionName: string) => collectionToUUID.has(collectionName),
+    [collectionToUUID],
+  );
 
   const getUpcomingTasks = (daysAhead = 30) => {
     if (!plan) return [];
@@ -289,6 +295,7 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
         getProgressPercent,
         getCurrentStageName,
         getUpcomingTasks,
+        isVarietyRegisteredOnBackend,
       }}
     >
       {children}

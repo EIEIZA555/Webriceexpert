@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CalendarDays } from "lucide-react";
 import { usePlans, type PlanTask } from "../contexts/PlansContext";
+import { useVarieties } from "../contexts/VarietiesContext";
 import { DayPicker, type DayContentProps } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
-import { addDaysToISODate, RICE_VARIETIES } from "../lib/planGenerator";
+import { addDaysToISODate, getCurrentStage } from "../lib/planGenerator";
 import { getSubStageLabelAtDAS } from "../lib/fixedPlan";
+import { computeHybridSchedule, getCurrentStageHybrid, getDasMilestoneEvents, getFixedMilestoneEvents } from "../lib/hybridSchedule";
 import { TaskGlyph } from "../lib/taskIcons";
 import {
   Select,
@@ -20,10 +22,48 @@ import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group";
 type CalendarView = "milestone" | "timeline";
 
 export default function Calendar() {
-  const { plan, plans, loading, setCurrentPlanId, getDaysSinceStart, getCurrentStageName } =
-    usePlans();
+  const { varietyConfigs, getRecord } = useVarieties();
+  const { plan, plans, loading, setCurrentPlanId, getDaysSinceStart } = usePlans();
   const [selectedDay, setSelectedDay] = useState<Date | undefined>(new Date());
   const [view, setView] = useState<CalendarView>("milestone");
+
+  const rec = plan ? getRecord(plan.varietyId) : undefined;
+  const cfg = useMemo(
+    () => (plan ? varietyConfigs.find((v) => v.id === plan.varietyId) : undefined),
+    [plan, varietyConfigs],
+  );
+
+  const milestoneEvents = useMemo(() => {
+    if (!plan) return [];
+    if (rec?.scheduleMode === "FIXED_DATE" && rec.harvestMonthDay && rec.fixedMilestones?.length) {
+      return getFixedMilestoneEvents(plan, rec);
+    }
+    return getDasMilestoneEvents(plan, cfg);
+  }, [plan, rec, cfg]);
+
+  const milestoneByDate = useMemo(() => {
+    const m = new Map<string, { name: string; dateISO: string }[]>();
+    for (const ev of milestoneEvents) {
+      const key = ev.dateISO.slice(0, 10);
+      const arr = m.get(key) ?? [];
+      arr.push(ev);
+      m.set(key, arr);
+    }
+    return m;
+  }, [milestoneEvents]);
+
+  const milestoneDates = useMemo(
+    () => [...new Set(milestoneEvents.map((e) => e.dateISO.slice(0, 10)))].map((k) => new Date(`${k}T12:00:00`)),
+    [milestoneEvents],
+  );
+
+  const hybrid = plan ? computeHybridSchedule(plan, rec, varietyConfigs) : null;
+  const calendarCurrentStage =
+    hybrid && plan
+      ? rec?.scheduleMode === "FIXED_DATE"
+        ? getCurrentStageHybrid(plan, rec, hybrid.daysSincePlant, varietyConfigs)
+        : getCurrentStage(plan.varietyId, hybrid.daysSincePlant, varietyConfigs)
+      : null;
 
   if (loading) {
     return (
@@ -54,15 +94,16 @@ export default function Calendar() {
   }
 
   const tasksByDate = groupTasksByDate(plan.tasks);
-  const taskDates = Array.from(tasksByDate.keys()).map((iso) => new Date(iso));
+  const taskDates = Array.from(tasksByDate.keys()).map((iso) => new Date(`${iso}T12:00:00`));
   const taskDateSet = new Set(Array.from(tasksByDate.keys()));
   const daysSinceStart = getDaysSinceStart();
-  const currentStage = getCurrentStageName();
-  const currentSubStage = getSubStageLabelAtDAS(plan.varietyId, daysSinceStart);
-  const stages = RICE_VARIETIES.find((v) => v.id === plan.varietyId)?.stages ?? [];
+  const dasForSubStage = hybrid?.daysSincePlant ?? daysSinceStart;
+  const currentSubStage = getSubStageLabelAtDAS(plan.varietyId, dasForSubStage, varietyConfigs);
+  const stages = cfg?.stages ?? [];
 
   const selectedKey = selectedDay != null ? format(selectedDay, "yyyy-MM-dd") : undefined;
-  const tasksForSelected = (selectedKey && tasksByDate.get(selectedKey)) ?? [];
+  const tasksForSelected: PlanTask[] = selectedKey ? tasksByDate.get(selectedKey) ?? [] : [];
+  const milestonesForSelected = selectedKey ? milestoneByDate.get(selectedKey) ?? [] : [];
   const sortedTimeline = [...plan.tasks].sort((a, b) => a.day - b.day);
 
   return (
@@ -72,7 +113,7 @@ export default function Calendar() {
           <div>
             <h2 className="text-2xl font-semibold mb-1">ปฏิทิน</h2>
             <p className="text-muted-foreground text-sm">
-              งานและ milestone ของแปลงที่เลือก (activePlotId) เท่านั้น
+              งานและ milestone ของแปลงนี้
             </p>
           </div>
           {plans.length > 1 && (
@@ -123,18 +164,25 @@ export default function Calendar() {
             locale={th}
             selected={selectedDay}
             onSelect={setSelectedDay}
-            modifiers={{ hasTask: taskDates }}
+            modifiers={{ hasTask: taskDates, hasMilestone: milestoneDates }}
             modifiersClassNames={{
               hasTask: "bg-emerald-100 text-emerald-800 font-semibold hover:bg-emerald-200",
+              hasMilestone: "bg-amber-50 text-amber-900 font-medium hover:bg-amber-100",
             }}
             components={{
               DayContent: (props: DayContentProps) => {
                 const key = format(props.date, "yyyy-MM-dd");
                 const hasTask = taskDateSet.has(key);
+                const hasMilestone = milestoneByDate.has(key);
                 return (
-                  <div className="flex flex-col items-center justify-center">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
                     <span>{props.date.getDate()}</span>
-                    {hasTask && <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                    <span className="flex gap-0.5">
+                      {hasTask && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" title="มีงาน" />}
+                      {hasMilestone && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" title="milestone" />
+                      )}
+                    </span>
                   </div>
                 );
               },
@@ -142,22 +190,31 @@ export default function Calendar() {
             className="rdp-custom text-sm"
           />
           <p className="mt-3 text-xs text-muted-foreground">
-            จุดสีเขียวใต้ตัวเลข แสดงว่าวันนั้นมีงานในแผนนี้
+            จุดเขียว = มีงานในแผน • จุดส้ม = milestone (DAS หรือวันเก็บเกี่ยวคงที่)
           </p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:p-6 shadow-sm">
-          <h3 className="text-sm font-semibold text-foreground mb-1">งานในวันที่เลือก</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-1">งานและ milestone ในวันที่เลือก</h3>
           <p className="text-xs text-muted-foreground mb-4">
             {selectedDay
               ? format(selectedDay, "EEE d MMM yyyy", { locale: th })
               : "ยังไม่ได้เลือกวันที่"}
           </p>
 
-          {tasksForSelected.length === 0 ? (
-            <p className="text-sm text-muted-foreground">ไม่มีงานในวันที่เลือก</p>
+          {tasksForSelected.length === 0 && milestonesForSelected.length === 0 ? (
+            <p className="text-sm text-muted-foreground">ไม่มีงานหรือ milestone ในวันที่เลือก</p>
           ) : (
             <ul className="space-y-3">
+              {milestonesForSelected.map((m, i) => (
+                <li
+                  key={`m-${m.dateISO}-${i}`}
+                  className="p-3 rounded-xl border border-amber-100 bg-amber-50/50"
+                >
+                  <p className="text-xs font-medium text-amber-800">Milestone</p>
+                  <p className="text-sm font-medium text-foreground">{m.name}</p>
+                </li>
+              ))}
               {tasksForSelected.map((task) => (
                 <li
                   key={task.id}
@@ -175,13 +232,46 @@ export default function Calendar() {
         </div>
       </div>
 
-      {/* Milestone view: ตามระยะหลักของพันธุ์ */}
-      {view === "milestone" && stages.length > 0 && (
+      {/* Milestone view: FIXED = ย้อนจากเก็บเกี่ยว | DAS = ตามระยะพันธุ์ */}
+      {view === "milestone" && milestoneEvents.length > 0 && rec?.scheduleMode === "FIXED_DATE" && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:p-6 shadow-sm">
-          <h3 className="text-sm font-semibold text-foreground mb-3">Milestone view (ตามระยะข้าว)</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-3">Milestone (วันเก็บเกี่ยวคงที่)</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+            {milestoneEvents.map((m) => {
+              const iso = m.dateISO.slice(0, 10);
+              const todayKey = format(new Date(), "yyyy-MM-dd");
+              const isToday = iso === todayKey;
+              return (
+                <div
+                  key={`${m.name}-${iso}`}
+                  className={`p-3 rounded-xl border ${
+                    isToday ? "bg-emerald-50 border-emerald-200" : "bg-slate-50/40 border-slate-200"
+                  }`}
+                >
+                  <p className="text-sm font-semibold">{m.name}</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {format(new Date(`${iso}T12:00:00`), "EEE d MMM yyyy", { locale: th })}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+          {(calendarCurrentStage || currentSubStage) && (
+            <p className="text-xs text-muted-foreground mt-3">
+              ระยะหลัก: {calendarCurrentStage ?? "-"} • ระยะย่อย: {currentSubStage} • DAS จากวันปลูก{" "}
+              {hybrid?.daysSincePlant ?? "-"}
+            </p>
+          )}
+        </div>
+      )}
+
+      {view === "milestone" && !(rec?.scheduleMode === "FIXED_DATE" && milestoneEvents.length > 0) && stages.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:p-6 shadow-sm">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Milestone view (DAS จากวันปลูก)</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
             {stages.map((s) => {
-              const isCurrent = daysSinceStart >= s.startDay && daysSinceStart <= s.endDay;
+              const d = hybrid?.daysSincePlant ?? daysSinceStart;
+              const isCurrent = d >= s.startDay && d <= s.endDay;
               const sStartISO = addDaysToISODate(plan.startDate, s.startDay);
               const sEndISO = addDaysToISODate(plan.startDate, s.endDay);
               const sTasks = plan.tasks.filter((t) => t.day >= s.startDay && t.day <= s.endDay);
@@ -204,9 +294,10 @@ export default function Calendar() {
               );
             })}
           </div>
-          {(currentStage || currentSubStage) && (
+          {(calendarCurrentStage || currentSubStage) && (
             <p className="text-xs text-muted-foreground mt-3">
-              ระยะหลัก: {currentStage ?? "-"} • ระยะย่อย: {currentSubStage} • วันที่ {daysSinceStart}
+              ระยะหลัก: {calendarCurrentStage ?? "-"} • ระยะย่อย: {currentSubStage} • DAS จากวันปลูก{" "}
+              {hybrid?.daysSincePlant ?? daysSinceStart}
             </p>
           )}
         </div>
@@ -217,7 +308,7 @@ export default function Calendar() {
         <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:p-6 shadow-sm">
           <h3 className="text-sm font-semibold text-foreground mb-1">Timeline static (จาก Fixed Plan)</h3>
           <p className="text-xs text-muted-foreground mb-4">
-            รายการงานคงที่ตามพันธุ์ — ไม่คำนวณใหม่จาก AI
+            รายงานตามระยะข้าวของพันธุ์นี้
           </p>
           <ul className="space-y-2 max-h-72 overflow-y-auto pr-1">
             {sortedTimeline.map((t) => {

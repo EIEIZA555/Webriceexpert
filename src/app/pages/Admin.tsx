@@ -7,6 +7,7 @@ import {
   HelpCircle,
   MessageSquare,
   Plus,
+  Sprout,
 } from "lucide-react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -29,8 +30,9 @@ import {
   DialogFooter,
 } from "../components/ui/dialog";
 import { apiFetch, API_BASE_URL, getAuthToken } from "../lib/api";
+import VarietiesAdminPanel from "./VarietiesAdminPanel";
 
-type Tab = "docs" | "faq" | "prompts";
+type Tab = "docs" | "faq" | "prompts" | "varieties";
 
 interface DocumentResponse {
   id: string;
@@ -254,6 +256,7 @@ export default function Admin() {
       label: "Prompt Templates",
       icon: <MessageSquare className="w-4 h-4" />,
     },
+    { key: "varieties", label: "พันธุ์ข้าว", icon: <Sprout className="w-4 h-4" /> },
   ];
 
   return (
@@ -261,7 +264,7 @@ export default function Admin() {
       <div className="mb-6">
         <h2 className="text-2xl font-semibold">จัดการระบบ</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          เอกสาร, คำถามที่พบบ่อย และ Prompt Templates
+          เอกสาร, คำถามที่พบบ่อย และ อื่นๆ
         </p>
       </div>
 
@@ -558,6 +561,8 @@ export default function Admin() {
           )}
         </div>
       )}
+
+      {activeTab === "varieties" && <VarietiesAdminPanel />}
     </div>
   );
 }

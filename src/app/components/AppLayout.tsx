@@ -13,6 +13,7 @@ import { Button } from "./ui/button";
 import { useState } from "react";
 import { FloatingChat } from "./FloatingChat";
 import { PlansProvider } from "../contexts/PlansContext";
+import { VarietiesProvider } from "../contexts/VarietiesContext";
 
 const navItems = [
   { path: "/app/plots", label: "แปลงนา", icon: Sprout, adminOnly: false },
@@ -37,6 +38,8 @@ export function AppLayout() {
   };
 
   return (
+    <VarietiesProvider>
+      <PlansProvider>
     <div className="h-screen bg-gray-50 flex overflow-hidden">
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-border hidden lg:flex flex-col">
@@ -197,12 +200,12 @@ export function AppLayout() {
       </div>
 
       {/* Main Content */}
-      <PlansProvider>
-        <main className="flex-1 overflow-auto">
-          <Outlet />
-        </main>
-        <FloatingChat />
-      </PlansProvider>
+      <main className="flex-1 overflow-auto">
+        <Outlet />
+      </main>
+      <FloatingChat />
     </div>
+      </PlansProvider>
+    </VarietiesProvider>
   );
 }

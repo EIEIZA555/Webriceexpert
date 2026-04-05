@@ -11,8 +11,13 @@ import {
   getCurrentStage,
   getRD43FertilizerDescription,
   getStageByDay,
+  type RiceVarietyConfig,
   type SoilTypeKey,
 } from "./planGenerator";
+
+function varietyListOrDefault(list?: RiceVarietyConfig[]): RiceVarietyConfig[] {
+  return list && list.length > 0 ? list : RICE_VARIETIES;
+}
 
 /** 10 ระยะย่อยตาม PRD (3 ระยะหลัก → ระยะย่อย) */
 export const CANONICAL_SUB_STAGE_KEYS = [
@@ -70,9 +75,13 @@ function rd43SubStageStarts(): number[] {
   return [0, 3, 21, 46, 56, 66, 73, 81, 89, 93];
 }
 
-/** แปลงพันธุ์อื่น: ยืดสัดส่วนจากช่วงหลักใน RICE_VARIETIES ให้ครบ 10 ช่วง */
-function genericSubStageStarts(varietyId: string, totalDays: number): number[] {
-  const v = RICE_VARIETIES.find((x) => x.id === varietyId);
+/** แปลงพันธุ์อื่น: ยืดสัดส่วนจากช่วงหลักในรายการพันธุ์ ให้ครบ 10 ช่วง */
+function genericSubStageStarts(
+  varietyId: string,
+  totalDays: number,
+  varietyList: RiceVarietyConfig[],
+): number[] {
+  const v = varietyList.find((x) => x.id === varietyId);
   if (!v) return [0, 1, 2, 3, 4, 5, 6, 7, 8, Math.max(9, totalDays - 1)];
 
   const [a, b, c, d] = v.stages;
@@ -97,12 +106,18 @@ function genericSubStageStarts(varietyId: string, totalDays: number): number[] {
   ];
 }
 
-export function getFixedPlanDefinition(varietyId: string): FixedPlanDefinition {
-  const v = RICE_VARIETIES.find((x) => x.id === varietyId);
+export function getFixedPlanDefinition(
+  varietyId: string,
+  varietyListArg?: RiceVarietyConfig[],
+): FixedPlanDefinition {
+  const varietyList = varietyListOrDefault(varietyListArg);
+  const v = varietyList.find((x) => x.id === varietyId);
   const totalDays = v?.lifecycleDays ?? 120;
 
   const subStageStartDays =
-    varietyId === "rd43" ? rd43SubStageStarts() : genericSubStageStarts(varietyId, totalDays);
+    varietyId === "rd43"
+      ? rd43SubStageStarts()
+      : genericSubStageStarts(varietyId, totalDays, varietyList);
 
   const ends = subStageEndDays(totalDays, subStageStartDays);
 
@@ -151,8 +166,12 @@ export function getFixedPlanDefinition(varietyId: string): FixedPlanDefinition {
   };
 }
 
-export function getSubStageLabelAtDAS(varietyId: string, das: number): string {
-  const def = getFixedPlanDefinition(varietyId);
+export function getSubStageLabelAtDAS(
+  varietyId: string,
+  das: number,
+  varietyListArg?: RiceVarietyConfig[],
+): string {
+  const def = getFixedPlanDefinition(varietyId, varietyListArg);
   const ends = subStageEndDays(def.totalDays, def.subStageStartDays);
   for (let i = 0; i < CANONICAL_SUB_STAGE_KEYS.length; i++) {
     const start = def.subStageStartDays[i];
@@ -165,13 +184,16 @@ export function getSubStageLabelAtDAS(varietyId: string, das: number): string {
   return das > def.totalDays ? "หลังเก็บเกี่ยว" : CANONICAL_SUB_STAGE_LABELS.germination;
 }
 
-export function listSubStagesWithDAS(varietyId: string): Array<{
+export function listSubStagesWithDAS(
+  varietyId: string,
+  varietyListArg?: RiceVarietyConfig[],
+): Array<{
   key: CanonicalSubStageKey;
   label: string;
   startDay: number;
   endDay: number;
 }> {
-  const def = getFixedPlanDefinition(varietyId);
+  const def = getFixedPlanDefinition(varietyId, varietyListArg);
   const ends = subStageEndDays(def.totalDays, def.subStageStartDays);
   return CANONICAL_SUB_STAGE_KEYS.map((key, i) => ({
     key,
@@ -206,20 +228,25 @@ export function getFertilizerRulesText(varietyId: string, soilType: SoilTypeKey)
   return "ดินร่วน: ไม่มีสูตรปุ๋ยละเอียดตามชนิดดินใน KB นี้ — ตอบจากคู่มือเท่านั้น ห้ามเดา";
 }
 
-export function buildFixedPlanSnapshotText(plan: PlantingPlan, das: number): string {
-  const def = getFixedPlanDefinition(plan.varietyId);
+export function buildFixedPlanSnapshotText(
+  plan: PlantingPlan,
+  das: number,
+  varietyListArg?: RiceVarietyConfig[],
+): string {
+  const def = getFixedPlanDefinition(plan.varietyId, varietyListArg);
   const milestonesDated = def.milestones.map((m) => ({
     name: m.name,
     day: m.day,
     dateISO: addDaysToISODate(plan.startDate, m.day),
   }));
-  const subStages = listSubStagesWithDAS(plan.varietyId).map((s) => ({
+  const subStages = listSubStagesWithDAS(plan.varietyId, varietyListArg).map((s) => ({
     ...s,
     startDate: addDaysToISODate(plan.startDate, s.startDay),
     endDate: addDaysToISODate(plan.startDate, s.endDay),
   }));
-  const currentSub = getSubStageLabelAtDAS(plan.varietyId, das);
-  const currentMain = getCurrentStage(plan.varietyId, das) ?? "-";
+  const currentSub = getSubStageLabelAtDAS(plan.varietyId, das, varietyListArg);
+  const vl = varietyListOrDefault(varietyListArg);
+  const currentMain = getCurrentStage(plan.varietyId, das, vl) ?? "-";
 
   return JSON.stringify(
     {
@@ -240,9 +267,14 @@ export function buildFixedPlanSnapshotText(plan: PlantingPlan, das: number): str
   );
 }
 
-export function buildRagContextPack(plan: PlantingPlan, das: number): string {
-  const def = getFixedPlanDefinition(plan.varietyId);
-  const fertilizerRules = getFertilizerRulesText(plan.varietyId, plan.soilType);
+export function buildRagContextPack(
+  plan: PlantingPlan & { soilType?: SoilTypeKey },
+  das: number,
+  varietyListArg?: RiceVarietyConfig[],
+): string {
+  const def = getFixedPlanDefinition(plan.varietyId, varietyListArg);
+  const soil = plan.soilType ?? "loam";
+  const fertilizerRules = getFertilizerRulesText(plan.varietyId, soil);
   const rd15Note =
     plan.varietyId === "kk15"
       ? "RD15/กข15: พันธุ์คู่แฝดจากหอมมะลิ 105 โดยรังสีแกมมา — ห้ามอ้างว่าเป็นพันธุ์ผสมจากสุพรรณบุรี"
@@ -255,16 +287,16 @@ export function buildRagContextPack(plan: PlantingPlan, das: number): string {
     `varietyId: ${plan.varietyId}`,
     `varietyName: ${plan.varietyName}`,
     `plantingDate: ${plan.startDate}`,
-    `soilType: ${plan.soilType}`,
+    `soilType: ${soil}`,
     `plantingMethod: ${plan.plantingMethod}`,
-    `วันที่นับเป็น DAS 0: ${PLANTING_METHODS.find((m) => m.key === plan.plantingMethod)?.dasZeroMeaning ?? "-"}`,
+    `วันที่นับเป็น DAS 0: ${PLANTING_METHODS.find((m) => m.key === plan.plantingMethod)?.label ?? "-"}`,
     `DAS: ${das}`,
     "",
     "fertilizerRules (จาก fixed plan / KB ภายในแอป):",
     fertilizerRules,
     "",
     "fixedPlanSnapshot (JSON):",
-    buildFixedPlanSnapshotText(plan, das),
+    buildFixedPlanSnapshotText(plan, das, varietyListArg),
     "",
     "policy: ต้อง cite แหล่งจาก KB; ถ้าไม่มีในคู่มือให้ตอบว่าไม่มีข้อมูลในคู่มือ",
     rd15Note ? `rd15OriginNote: ${rd15Note}` : "",
@@ -280,10 +312,14 @@ export function generateFixedPlanTasks(params: {
   startDate: string;
   soilType: SoilTypeKey;
   plantingMethod: PlantingMethodKey;
+  varietyList?: RiceVarietyConfig[];
 }): PlanTask[] {
   const { varietyId, startDate, soilType, plantingMethod } = params;
-  const def = getFixedPlanDefinition(varietyId);
+  const vl = varietyListOrDefault(params.varietyList);
+  const def = getFixedPlanDefinition(varietyId, vl);
   const tasks: PlanTask[] = [];
+
+  const stageAt = (day: number) => getStageByDay(varietyId, day, vl);
 
   const push = (
     day: number,
@@ -302,8 +338,8 @@ export function generateFixedPlanTasks(params: {
     });
   };
 
-  /** งานตามวิธีปลูก — DAS 0 = วันที่ผู้ใช้เลือก (ปักดำ / หว่านน้ำตม / หว่านแห้ง) */
-  if (plantingMethod === "transplanting") {
+  /** งานตามวิธีปลูก — DAS 0 = วันที่ผู้ใช้เลือก */
+  if (plantingMethod === "transplant") {
     push(
       -18,
       "การเพาะกล้า",
@@ -315,9 +351,9 @@ export function generateFixedPlanTasks(params: {
       0,
       "การถอนกล้าและปักดำ",
       "วันนี้คือ DAS 0 = วันปักดำในแปลงนา (เริ่มนับตามไทม์ไลน์)",
-      getStageByDay(varietyId, 0) ?? "ระยะต้นกล้า",
+      stageAt(0) ?? "ระยะต้นกล้า",
     );
-  } else if (plantingMethod === "wet_seeded") {
+  } else if (plantingMethod === "broadcast") {
     push(
       -1,
       "การแช่และบ่มเมล็ดพันธุ์",
@@ -328,7 +364,7 @@ export function generateFixedPlanTasks(params: {
       0,
       "การทำเทือกและหว่านน้ำตม",
       "จัดเลน/น้ำตม แล้วหว่าน — DAS 0 = วันหว่านเมล็ดลงนา",
-      getStageByDay(varietyId, 0) ?? "ระยะต้นกล้า",
+      stageAt(0) ?? "ระยะต้นกล้า",
     );
   } else {
     push(-2, "การไถกลบ / ไถแปร", "เตรียมดินแห้งก่อนหว่านหรือหยอด", "ก่อนหว่าน");
@@ -336,47 +372,47 @@ export function generateFixedPlanTasks(params: {
       0,
       "การหว่านเมล็ด / หยอด",
       "DAS 0 = วันหว่านหรือหยอดเมล็ด",
-      getStageByDay(varietyId, 0) ?? "ระยะต้นกล้า",
+      stageAt(0) ?? "ระยะต้นกล้า",
     );
     push(
       2,
       "การให้น้ำหลังหว่าน",
       "รดหรือย่นน้ำเพื่อกระตุ้นการงอก",
-      getStageByDay(varietyId, 2) ?? "ระยะต้นกล้า",
+      stageAt(2) ?? "ระยะต้นกล้า",
     );
   }
 
   if (varietyId === "rd43") {
     const dayAfterPlant =
-      plantingMethod === "transplanting"
+      plantingMethod === "transplant"
         ? "ตรวจกล้าหลังปักดำ / การตั้งตัว"
         : "ตรวจการงอก ต้นกล้าแรก";
-    push(1, dayAfterPlant, null, getStageByDay(varietyId, 1) ?? "ระยะกล้า");
-    push(10, "ตรวจระดับน้ำตื้น (คุมวัชพืช)", null, getStageByDay(varietyId, 10) ?? "ระยะกล้า");
+    push(1, dayAfterPlant, null, stageAt(1) ?? "ระยะกล้า");
+    push(10, "ตรวจระดับน้ำตื้น (คุมวัชพืช)", null, stageAt(10) ?? "ระยะกล้า");
     push(
       21,
       "ใส่ปุ๋ยเร่งต้น (รอบ 1)",
       getRD43FertilizerDescription(soilType, 1),
-      getStageByDay(varietyId, 21) ?? "ระยะแตกกอ",
+      stageAt(21) ?? "ระยะแตกกอ",
     );
-    push(35, "พิจารณาแกล้งข้าว (AWD) ตามความเหมาะสม", null, getStageByDay(varietyId, 35) ?? "ระยะแตกกอ");
+    push(35, "พิจารณาแกล้งข้าว (AWD) ตามความเหมาะสม", null, stageAt(35) ?? "ระยะแตกกอ");
     push(
       46,
       "ใส่ปุ๋ยสูตรรับรวง (รอบ 2)",
       getRD43FertilizerDescription(soilType, 2),
-      getStageByDay(varietyId, 46) ?? "ระยะรับท้อง",
+      stageAt(46) ?? "ระยะรับท้อง",
     );
-    push(60, "ตรวจรวง/น้ำหนักช่อ — เตรียมช่วงออกดอก", null, getStageByDay(varietyId, 60) ?? "ระยะรับท้อง");
+    push(60, "ตรวจรวง/น้ำหนักช่อ — เตรียมช่วงออกดอก", null, stageAt(60) ?? "ระยะรับท้อง");
     push(
       66,
       "เร่งรักษาระดับน้ำช่วงออกดอก (ห้ามขาดน้ำ)",
       def.constraintsByStage[CANONICAL_SUB_STAGE_LABELS.heading]?.[0] ?? null,
-      getStageByDay(varietyId, 66) ?? "ระยะออกดอกและสุกแก่",
+      stageAt(66) ?? "ระยะออกดอกและสุกแก่",
     );
-    push(85, "เตรียมเก็บเกี่ยว / ตรวจความชื้นเมล็ด", null, getStageByDay(varietyId, 85) ?? "ระยะออกดอกและสุกแก่");
-    push(95, "เก็บเกี่ยว (ตาม fixed plan RD43)", "เก็บเกี่ยว DAS 95", getStageByDay(varietyId, 95) ?? "ระยะออกดอกและสุกแก่");
+    push(85, "เตรียมเก็บเกี่ยว / ตรวจความชื้นเมล็ด", null, stageAt(85) ?? "ระยะออกดอกและสุกแก่");
+    push(95, "เก็บเกี่ยว (ตาม fixed plan RD43)", "เก็บเกี่ยว DAS 95", stageAt(95) ?? "ระยะออกดอกและสุกแก่");
   } else {
-    const v = RICE_VARIETIES.find((x) => x.id === varietyId);
+    const v = vl.find((x) => x.id === varietyId);
     const harvestDay = v?.lifecycleDays ?? 120;
     const fe = def.fertilizerEvents;
     for (const e of fe) {
@@ -384,20 +420,20 @@ export function generateFixedPlanTasks(params: {
         e.day,
         e.round === 1 ? "ใส่ปุ๋ยเร่งต้น (รอบ 1)" : "ใส่ปุ๋ยสูตรรับรวง (รอบ 2)",
         getFertilizerRulesText(varietyId, soilType),
-        getStageByDay(varietyId, e.day) ?? "ตามระยะ",
+        stageAt(e.day) ?? "ตามระยะ",
       );
     }
     push(
       Math.floor(harvestDay * 0.55),
       "ตรวจน้ำช่วงรับท้อง — ห้ามให้ขาดน้ำก่อนออกดอก",
       null,
-      getStageByDay(varietyId, Math.floor(harvestDay * 0.55)) ?? "ระยะออกดอก",
+      stageAt(Math.floor(harvestDay * 0.55)) ?? "ระยะออกดอก",
     );
     push(
       harvestDay,
       "เก็บเกี่ยว (ตาม fixed plan พันธุ์นี้)",
       `เก็บเกี่ยว DAS ${harvestDay}`,
-      getStageByDay(varietyId, harvestDay) ?? "เก็บเกี่ยว",
+      stageAt(harvestDay) ?? "เก็บเกี่ยว",
     );
   }
 

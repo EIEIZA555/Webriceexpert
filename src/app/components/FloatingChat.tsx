@@ -5,6 +5,7 @@ import { isAuthenticated } from "../lib/auth";
 import { usePlans } from "../contexts/PlansContext";
 import { getCurrentStage } from "../lib/planGenerator";
 import { buildRagContextPack } from "../lib/fixedPlan";
+import { useVarieties } from "../contexts/VarietiesContext";
 
 const formatTime = (date: Date) =>
   date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
@@ -18,10 +19,13 @@ const WELCOME_MESSAGE = {
 
 interface ChatMessage {
   id: number;
+  /** ข้อความที่แสดงใน UI (คำถามที่ผู้ใช้พิมพ์ — ไม่รวม CONTEXT_PACK) */
   text: string;
   sender: "user" | "bot";
   timestamp: Date;
   sources?: string[];
+  /** ข้อความเต็มที่ส่งไป `/chat` เมื่อมีแผนปลูก (รวมแพ็กบริบท RAG) — ห้ามโชว์ในแชท */
+  apiPayload?: string;
 }
 
 interface ChatResponse {
@@ -42,8 +46,19 @@ interface PromptTemplate {
   content: string;
 }
 
+/** ดึงเฉพาะคำถามที่ผู้ใช้พิมพ์จากข้อความที่เก็บใน DB (ตัด CONTEXT_PACK ออก) */
+function toDisplayUserQuestion(storedQuestion: string): string {
+  const marker = "คำถาม: ";
+  const idx = storedQuestion.lastIndexOf(marker);
+  if (idx !== -1) {
+    return storedQuestion.slice(idx + marker.length).trim();
+  }
+  return storedQuestion.trim();
+}
+
 export function FloatingChat() {
   const { plan, getDaysSinceStart, getCurrentStageName } = usePlans();
+  const { varietyConfigs } = useVarieties();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [inputMessage, setInputMessage] = useState("");
@@ -74,7 +89,15 @@ export function FloatingChat() {
       if (history.length === 0) return;
       const loaded: ChatMessage[] = [WELCOME_MESSAGE];
       history.forEach((h, i) => {
-        loaded.push({ id: i * 2 + 1, text: h.question, sender: "user", timestamp: new Date(h.created_at) });
+        const displayQ = toDisplayUserQuestion(h.question);
+        const hasPack = h.question.includes("---CONTEXT_PACK");
+        loaded.push({
+          id: i * 2 + 1,
+          text: displayQ,
+          sender: "user",
+          timestamp: new Date(h.created_at),
+          ...(hasPack ? { apiPayload: h.question } : {}),
+        });
         loaded.push({ id: i * 2 + 2, text: h.answer, sender: "bot", timestamp: new Date(h.created_at) });
       });
       setMessages(loaded);
@@ -88,9 +111,12 @@ export function FloatingChat() {
       if (!plan) return inputMessage;
 
       const das = getDaysSinceStart();
-      const stage = getCurrentStageName() ?? getCurrentStage(plan.varietyId, das) ?? "ไม่ระบุระยะ";
+      const stage =
+        getCurrentStageName() ??
+        getCurrentStage(plan.varietyId, das, varietyConfigs) ??
+        "ไม่ระบุระยะ";
       // PRD: fixedPlanSnapshot + fertilizerRules + activePlotId ในแพ็กเก็ตเดียว (ส่งเป็นข้อความ — API เดิมไม่เปลี่ยน)
-      const pack = buildRagContextPack(plan, das);
+      const pack = buildRagContextPack(plan, das, varietyConfigs);
       const contextPrefix =
         `${pack}\n` +
         `สรุปย่อสำหรับอ่านเร็ว: ${plan.plotName ?? "แปลง"} | ${plan.varietyName} | DAS ${das} | ระยะหลัก: ${stage}\n` +
@@ -102,11 +128,12 @@ export function FloatingChat() {
       return contextPrefix + inputMessage;
     })();
 
-    const userMessage = {
+    const userMessage: ChatMessage = {
       id: messages.length + 1,
-      text: question,
-      sender: "user" as const,
+      text: inputMessage.trim(),
+      sender: "user",
       timestamp: new Date(),
+      ...(plan ? { apiPayload: question } : {}),
     };
     setMessages((prev) => [...prev, userMessage]);
     setInputMessage("");
@@ -117,7 +144,10 @@ export function FloatingChat() {
       const history = messages
         .filter((m) => m.id !== 0)
         .slice(-6)
-        .map((m) => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text }));
+        .map((m) => ({
+          role: m.sender === "user" ? "user" : "assistant",
+          content: m.sender === "user" ? (m.apiPayload ?? m.text) : m.text,
+        }));
       const data = await apiFetch<ChatResponse>("/chat/", {
         method: "POST",
         body: JSON.stringify({ question, history }),

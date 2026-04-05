@@ -6,25 +6,20 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { ArrowLeft, Check, Leaf, Search } from "lucide-react";
 import { usePlans } from "../contexts/PlansContext";
-import { PLANTING_METHODS, type PlantingMethodKey } from "../lib/plantingMethod";
+import { useVarieties } from "../contexts/VarietiesContext";
+import { PLANTING_METHODS, plantingDateFromPlanStartDate, type PlantingMethodKey } from "../lib/plantingMethod";
+import { resolveHarvestDateForSeason, shouldWarnLatePlantingFixed } from "../lib/hybridSchedule";
 import { apiFetch } from "../lib/api";
-
-interface ApiVariety {
-  id: string;
-  collection_name: string;
-  name: string;
-  harvest_age_days: number;
-  is_photoperiod_sensitive: boolean;
-  supported_methods: string[];
-  description: string;
-  reference_url: string | null;
-}
+import { RICE_SEASON_LABELS } from "../lib/riceVarietyTypes";
 
 export default function CreatePlan() {
   const navigate = useNavigate();
-  const { createPlan } = usePlans();
+  const { createPlan, isVarietyRegisteredOnBackend } = usePlans();
+  const { varieties } = useVarieties();
   const [step, setStep] = useState(1);
-  const [varieties, setVarieties] = useState<ApiVariety[]>([]);
+  /** รองรับวิธีปลูกจาก GET /varieties/ (slug เดียวกับ id พันธุ์) */
+  const [methodByCollection, setMethodByCollection] = useState<Record<string, string[]>>({});
+
   const [formData, setFormData] = useState({
     variety: "",
     plantDate: "",
@@ -37,14 +32,26 @@ export default function CreatePlan() {
   const [varietyQuery, setVarietyQuery] = useState("");
 
   useEffect(() => {
-    apiFetch<ApiVariety[]>("/varieties/").then(setVarieties).catch(() => {});
+    apiFetch<Array<{ collection_name: string; supported_methods: string[] }>>("/varieties/")
+      .then((rows) => {
+        const o: Record<string, string[]> = {};
+        rows.forEach((r) => {
+          o[r.collection_name] = r.supported_methods;
+        });
+        setMethodByCollection(o);
+      })
+      .catch(() => {});
   }, []);
 
-  const selectedVariety = varieties.find((v) => v.collection_name === formData.variety);
+  const selectedVariety = varieties.find((v) => v.id === formData.variety);
 
-  const availableMethods = selectedVariety
-    ? PLANTING_METHODS.filter((m) => selectedVariety.supported_methods.includes(m.key))
-    : PLANTING_METHODS;
+  const methodsForCollection = formData.variety
+    ? methodByCollection[formData.variety]
+    : undefined;
+  const availableMethods =
+    selectedVariety && methodsForCollection?.length
+      ? PLANTING_METHODS.filter((m) => methodsForCollection.includes(m.key))
+      : PLANTING_METHODS;
 
   const filteredVarieties = useMemo(() => {
     const q = varietyQuery.trim().toLowerCase();
@@ -52,16 +59,34 @@ export default function CreatePlan() {
     return varieties.filter(
       (v) =>
         v.name.toLowerCase().includes(q) ||
-        v.description.toLowerCase().includes(q) ||
-        v.collection_name.toLowerCase().includes(q),
+        v.id.toLowerCase().includes(q) ||
+        RICE_SEASON_LABELS[v.seasonType].toLowerCase().includes(q),
     );
   }, [varietyQuery, varieties]);
 
+  const fixedLatePlantingWarning = useMemo(() => {
+    const v = selectedVariety;
+    if (
+      !v ||
+      v.scheduleMode !== "FIXED_DATE" ||
+      !v.harvestMonthDay ||
+      !formData.plantDate ||
+      !formData.plantingMethod
+    ) {
+      return false;
+    }
+    const plantingISO = plantingDateFromPlanStartDate(
+      formData.plantDate,
+      formData.plantingMethod as PlantingMethodKey,
+    );
+    const harvestISO = resolveHarvestDateForSeason(plantingISO, v.harvestMonthDay);
+    return shouldWarnLatePlantingFixed(plantingISO, harvestISO);
+  }, [selectedVariety, formData.plantDate, formData.plantingMethod]);
+
   const displayVarieties = useMemo(() => {
-    const selected = varieties.find((v) => v.collection_name === formData.variety);
+    const selected = varieties.find((v) => v.id === formData.variety);
     if (!selected) return filteredVarieties;
-    if (filteredVarieties.some((v) => v.collection_name === selected.collection_name))
-      return filteredVarieties;
+    if (filteredVarieties.some((v) => v.id === selected.id)) return filteredVarieties;
     return [selected, ...filteredVarieties];
   }, [filteredVarieties, formData.variety, varieties]);
 
@@ -79,6 +104,11 @@ export default function CreatePlan() {
     setIsLoading(true);
     setError(null);
     try {
+      if (!isVarietyRegisteredOnBackend(formData.variety)) {
+        throw new Error(
+          "พันธุ์นี้ยังไม่ลงทะเบียนในระบบหลังบ้าน — สร้างแผนไม่ได้ โปรดเลือกพันธุ์ที่มีใน API หรือเพิ่มพันธุ์ที่เซิร์ฟเวอร์ก่อน",
+        );
+      }
       await createPlan({
         varietyId: formData.variety,
         startDate: formData.plantDate,
@@ -196,36 +226,44 @@ export default function CreatePlan() {
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {displayVarieties.map((variety) => (
+                    {displayVarieties.map((variety) => {
+                      const onBackend = isVarietyRegisteredOnBackend(variety.id);
+                      return (
                       <button
-                        key={variety.collection_name}
+                        key={variety.id}
                         type="button"
                         onClick={() =>
-                          setFormData({ ...formData, variety: variety.collection_name, plantingMethod: "" })
+                          setFormData({ ...formData, variety: variety.id, plantingMethod: "" })
                         }
                         className={`min-h-[5.5rem] p-4 rounded-xl border-2 text-left transition-all hover:border-primary/50 ${
-                          formData.variety === variety.collection_name
+                          formData.variety === variety.id
                             ? "border-primary bg-primary/5 ring-1 ring-primary/20"
                             : "border-border bg-background/80"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                           <h3 className="text-base font-medium leading-snug">{variety.name}</h3>
-                          {formData.variety === variety.collection_name && (
+                          {formData.variety === variety.id && (
                             <div className="w-6 h-6 shrink-0 rounded-full bg-primary flex items-center justify-center">
                               <Check className="w-4 h-4 text-white" />
                             </div>
                           )}
                         </div>
                         <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed line-clamp-3">
-                          {variety.description}
+                          {RICE_SEASON_LABELS[variety.seasonType]} •{" "}
+                          {variety.photoperiodSensitive ? "ไวต่อช่วงแสง" : "ไม่ไวต่อช่วงแสง"} • DAS สูงสุด{" "}
+                          {variety.totalDays} วัน
                         </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          อายุเก็บเกี่ยว {variety.harvest_age_days} วัน
-                          {variety.is_photoperiod_sensitive ? " • ไวแสง (นาปีเท่านั้น)" : ""}
+                        <p className="text-xs mt-1.5">
+                          {onBackend ? (
+                            <span className="text-emerald-700">ลงทะเบียนระบบ — สร้างแผนได้</span>
+                          ) : (
+                            <span className="text-amber-700">ยังไม่พบใน API — สร้างแผนไม่ได้จนกว่าจะลงทะเบียน</span>
+                          )}
                         </p>
                       </button>
-                    ))}
+                    );
+                    })}
                   </div>
                 )}
               </div>
@@ -289,6 +327,18 @@ export default function CreatePlan() {
                   />
                 </div>
 
+                {fixedLatePlantingWarning && (
+                  <div
+                    className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+                    role="status"
+                  >
+                    <p className="font-medium text-amber-900">คำเตือน</p>
+                    <p className="mt-1 text-amber-900/90">
+                      ปลูกช้าเกินไป อาจส่งผลต่อผลผลิต เนื่องจากข้าวจะออกดอกตามฤดูกาล (พันธุ์กำหนดวันเก็บเกี่ยวคงที่)
+                    </p>
+                  </div>
+                )}
+
                 <div>
                   <Label className="mb-3 block">วิธีการปลูก</Label>
                   {selectedVariety && (
@@ -326,7 +376,7 @@ export default function CreatePlan() {
                   <h4 className="text-sm mb-2">สรุปแผนของคุณ</h4>
                   <div className="text-sm space-y-1 text-muted-foreground">
                     <p>• พันธุ์ข้าว: {selectedVariety?.name ?? "-"}</p>
-                    <p>• อายุเก็บเกี่ยว: {selectedVariety?.harvest_age_days ?? "-"} วัน</p>
+                    <p>• อายุเก็บเกี่ยว: {selectedVariety?.totalDays ?? "-"} วัน</p>
                     <p>• วันที่ปลูก: {formData.plantDate}</p>
                     <p>• ชื่อแปลง: {formData.plotName || "-"}</p>
                     <p>• ขนาดพื้นที่: {formData.landSize || "-"} ไร่</p>

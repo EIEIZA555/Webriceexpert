@@ -10,8 +10,14 @@ import {
   CheckCircle2,
   Sprout,
   ArrowLeft,
+  MapPin,
+  AlertTriangle,
 } from "lucide-react";
 import { usePlans, type PlanTask } from "../contexts/PlansContext";
+import { useVarieties } from "../contexts/VarietiesContext";
+import { computeHybridSchedule, getCurrentStageHybrid } from "../lib/hybridSchedule";
+import { getCurrentStage } from "../lib/planGenerator";
+import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
 import { motion } from "motion/react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
@@ -30,11 +36,9 @@ export default function PlotDashboard() {
     setCurrentPlanId,
     toggleTask,
     getDaysSinceStart,
-    getTotalDays,
-    getProgressPercent,
-    getCurrentStageName,
     getUpcomingTasks,
   } = usePlans();
+  const { varietyConfigs, getRecord } = useVarieties();
 
   useEffect(() => {
     if (!id) return;
@@ -65,9 +69,14 @@ export default function PlotDashboard() {
   }
 
   const daysSinceStart = getDaysSinceStart();
-  const totalDays = getTotalDays();
-  const progressPercent = getProgressPercent();
-  const currentStage = getCurrentStageName();
+  const rec = getRecord(activePlot.varietyId);
+  const hybrid = computeHybridSchedule(activePlot, rec, varietyConfigs);
+  const progressPercent = hybrid.progressPercent;
+  const currentStage =
+    (rec?.scheduleMode === "FIXED_DATE"
+      ? getCurrentStageHybrid(activePlot, rec, hybrid.daysSincePlant, varietyConfigs)
+      : getCurrentStage(activePlot.varietyId, hybrid.daysSincePlant, varietyConfigs)) ??
+    "เก็บเกี่ยวแล้ว";
   const upcomingTasks = getUpcomingTasks(30);
 
   // group tasks ตาม stage จาก backend
@@ -93,18 +102,29 @@ export default function PlotDashboard() {
 
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+      {/* Header — เน้นชื่อแปลงเป็นหลัก */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
+        <div className="min-w-0 space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-emerald-700/90">
             แดชบอร์ดแปลงนา
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {activePlot.plotName || "ไม่ระบุชื่อแปลง"} • {activePlot.varietyName} •{" "}
-            {getPlantingMethodLabel(activePlot.plantingMethod)}
           </p>
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+              <MapPin className="h-6 w-6" aria-hidden />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground break-words">
+                {activePlot.plotName?.trim() || "ไม่ระบุชื่อแปลง"}
+              </h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                <span className="font-medium text-foreground/90">{activePlot.varietyName}</span>
+                <span className="mx-1.5 text-muted-foreground/70">•</span>
+                <span>{getPlantingMethodLabel(activePlot.plantingMethod)}</span>
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <Button
             variant="outline"
             onClick={() => navigate("/app/plots")}
@@ -115,6 +135,16 @@ export default function PlotDashboard() {
           </Button>
         </div>
       </div>
+
+      {hybrid.showFixedWarning && (
+        <Alert variant="destructive" className="mb-6 border-amber-200 bg-amber-50 text-amber-950 [&>svg]:text-amber-700">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>คำเตือนจากผู้เชี่ยวชาญ</AlertTitle>
+          <AlertDescription>
+            ปลูกช้าเกินไป อาจส่งผลต่อผลผลิต เนื่องจากข้าวจะออกดอกตามฤดูกาล (พันธุ์ไวต่อช่วงแสง / วันเก็บเกี่ยวคงที่)
+          </AlertDescription>
+        </Alert>
+      )}
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 mb-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -127,7 +157,7 @@ export default function PlotDashboard() {
             </div>
             <p className="text-xl font-semibold text-foreground mb-2">{currentStage ?? "-"}</p>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              วันที่ {daysSinceStart} • เริ่มปลูก{" "}
+              DAS จากวันปลูก {hybrid.daysSincePlant} วัน • เริ่มปลูก{" "}
               {format(new Date(activePlot.startDate), "d MMM yyyy", { locale: th })}
             </p>
             <p className="text-sm text-muted-foreground mt-0.5">
@@ -161,9 +191,17 @@ export default function PlotDashboard() {
                 </span>
               </div>
             </div>
-            <p className="font-medium text-foreground text-sm">ความคืบหน้าระยะตามวงจร</p>
+            <p className="font-medium text-foreground text-sm">ความคืบหน้าเทียบวันเก็บเกี่ยวเป้าหมาย</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {totalDays - daysSinceStart > 0 ? `อีก ${totalDays - daysSinceStart} วัน` : "ครบวงจร"}
+              {hybrid.mode === "FIXED_DATE" && hybrid.daysToHarvest != null
+                ? hybrid.daysToHarvest > 0
+                  ? `ถึงเก็บเกี่ยวเป้าหมายอีก ${hybrid.daysToHarvest} วัน`
+                  : hybrid.daysToHarvest === 0
+                    ? "ถึงวันเก็บเกี่ยวเป้าหมายวันนี้"
+                    : `เลยวันเก็บเกี่ยวเป้าหมายแล้ว ${-hybrid.daysToHarvest} วัน`
+                : Math.max(0, hybrid.totalCycleDays - hybrid.daysSincePlant) > 0
+                  ? `อีก ${Math.max(0, hybrid.totalCycleDays - hybrid.daysSincePlant)} วันถึงเก็บเกี่ยว (DAS)`
+                  : "ครบวงจรตามอายุพันธุ์"}
             </p>
           </Card>
 
@@ -289,9 +327,14 @@ export default function PlotDashboard() {
         {/* Optional growth progress bar (visual) */}
         <Card className="p-6 rounded-2xl border border-slate-100 bg-white">
           <p className="text-sm text-muted-foreground mb-2">ความคืบหน้า</p>
+          <p className="text-sm text-foreground mb-3">{hybrid.plotSummaryLine}</p>
           <div className="flex justify-between text-xs text-muted-foreground mb-2">
-            <span>ผ่านไปแล้ว {daysSinceStart} วัน</span>
-            <span>ระยะเวลาแผนทั้งหมด {totalDays} วัน</span>
+            <span>ผ่านไปแล้ว {hybrid.daysSincePlant} วัน (นับจากวันปลูก)</span>
+            <span>
+              {hybrid.mode === "FIXED_DATE" && hybrid.harvestDateISO
+                ? `เก็บเกี่ยวเป้าหมาย ${hybrid.harvestDateISO}`
+                : `รอบรวม ~${hybrid.totalCycleDays} วัน`}
+            </span>
           </div>
           <Progress value={progressPercent} className="h-2" />
         </Card>
