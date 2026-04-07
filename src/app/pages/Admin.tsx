@@ -70,11 +70,13 @@ const UPLOAD_COLLECTIONS: { value: string; label: string }[] = [
 function FaqTab({ faq, faqLoading }: { faq: FaqItem[]; faqLoading: boolean }) {
   return (
     <div className="space-y-4">
-      <h3 className="font-medium">คำถามที่ถามบ่อย</h3>
+      <h3 className="font-medium">คำถามที่ถามบ่อย ({faq.length})</h3>
       {faqLoading ? (
         <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
       ) : faq.length === 0 ? (
-        <p className="text-sm text-muted-foreground">ยังไม่มีประวัติการสนทนา</p>
+        <Card className="p-8 rounded-xl text-center text-muted-foreground text-sm">
+          ยังไม่มีประวัติการสนทนา
+        </Card>
       ) : (
         <div className="divide-y divide-border border border-border rounded-xl overflow-hidden bg-white">
           {faq.map((item, i) => (
@@ -244,18 +246,12 @@ export default function Admin() {
     }
   };
 
+  const [varietyCount, setVarietyCount] = useState(0);
+
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    {
-      key: "docs",
-      label: `เอกสาร (${documents.length})`,
-      icon: <FileText className="w-4 h-4" />,
-    },
+    { key: "docs", label: "เอกสาร", icon: <FileText className="w-4 h-4" /> },
     { key: "faq", label: "FAQ", icon: <HelpCircle className="w-4 h-4" /> },
-    {
-      key: "prompts",
-      label: "Prompt Templates",
-      icon: <MessageSquare className="w-4 h-4" />,
-    },
+    { key: "prompts", label: "Prompt Templates", icon: <MessageSquare className="w-4 h-4" /> },
     { key: "varieties", label: "พันธุ์ข้าว", icon: <Sprout className="w-4 h-4" /> },
   ];
 
@@ -290,7 +286,7 @@ export default function Admin() {
       {activeTab === "docs" && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <h3 className="font-medium flex-1">เอกสารในระบบ</h3>
+            <h3 className="font-medium flex-1">เอกสารในระบบ ({documents.length})</h3>
             <Button
               className="bg-primary hover:bg-primary/90 rounded-lg"
               onClick={() => {
@@ -562,7 +558,7 @@ export default function Admin() {
         </div>
       )}
 
-      {activeTab === "varieties" && <VarietiesAdminPanel />}
+      {activeTab === "varieties" && <VarietiesAdminPanel onCountChange={setVarietyCount} />}
     </div>
   );
 }

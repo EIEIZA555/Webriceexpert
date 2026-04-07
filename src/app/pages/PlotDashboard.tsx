@@ -11,13 +11,8 @@ import {
   Sprout,
   ArrowLeft,
   MapPin,
-  AlertTriangle,
 } from "lucide-react";
 import { usePlans, type PlanTask } from "../contexts/PlansContext";
-import { useVarieties } from "../contexts/VarietiesContext";
-import { computeHybridSchedule, getCurrentStageHybrid } from "../lib/hybridSchedule";
-import { getCurrentStage } from "../lib/planGenerator";
-import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
 import { motion } from "motion/react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
@@ -37,8 +32,9 @@ export default function PlotDashboard() {
     toggleTask,
     getDaysSinceStart,
     getUpcomingTasks,
+    getCurrentStageName,
+    getProgressPercent,
   } = usePlans();
-  const { varietyConfigs, getRecord } = useVarieties();
 
   useEffect(() => {
     if (!id) return;
@@ -69,15 +65,20 @@ export default function PlotDashboard() {
   }
 
   const daysSinceStart = getDaysSinceStart();
-  const rec = getRecord(activePlot.varietyId);
-  const hybrid = computeHybridSchedule(activePlot, rec, varietyConfigs);
-  const progressPercent = hybrid.progressPercent;
-  const currentStage =
-    (rec?.scheduleMode === "FIXED_DATE"
-      ? getCurrentStageHybrid(activePlot, rec, hybrid.daysSincePlant, varietyConfigs)
-      : getCurrentStage(activePlot.varietyId, hybrid.daysSincePlant, varietyConfigs)) ??
-    "เก็บเกี่ยวแล้ว";
+  const progressPercent = getProgressPercent();
+  const currentStage = getCurrentStageName() ?? "เก็บเกี่ยวแล้ว";
   const upcomingTasks = getUpcomingTasks(30);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const future30 = new Date(today);
+  future30.setDate(future30.getDate() + 30);
+  const hasTasksIn30Days = activePlot.tasks.some((t) => {
+    const d = new Date(t.date);
+    d.setHours(0, 0, 0, 0);
+    return d >= today && d <= future30;
+  });
+  const upcomingLabel = hasTasksIn30Days ? "งานที่ต้องทำ" : "งานถัดไปที่ต้องทำ";
 
   // group tasks ตาม stage จาก backend
   const stageMap = new Map<string, { startDay: number; endDay: number; tasks: PlanTask[] }>();
@@ -136,15 +137,6 @@ export default function PlotDashboard() {
         </div>
       </div>
 
-      {hybrid.showFixedWarning && (
-        <Alert variant="destructive" className="mb-6 border-amber-200 bg-amber-50 text-amber-950 [&>svg]:text-amber-700">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>คำเตือนจากผู้เชี่ยวชาญ</AlertTitle>
-          <AlertDescription>
-            ปลูกช้าเกินไป อาจส่งผลต่อผลผลิต เนื่องจากข้าวจะออกดอกตามฤดูกาล (พันธุ์ไวต่อช่วงแสง / วันเก็บเกี่ยวคงที่)
-          </AlertDescription>
-        </Alert>
-      )}
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 mb-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -157,7 +149,7 @@ export default function PlotDashboard() {
             </div>
             <p className="text-xl font-semibold text-foreground mb-2">{currentStage ?? "-"}</p>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              DAS จากวันปลูก {hybrid.daysSincePlant} วัน • เริ่มปลูก{" "}
+              ผ่านมาแล้ว {daysSinceStart} วัน • เริ่มปลูก{" "}
               {format(new Date(activePlot.startDate), "d MMM yyyy", { locale: th })}
             </p>
             <p className="text-sm text-muted-foreground mt-0.5">
@@ -193,20 +185,14 @@ export default function PlotDashboard() {
             </div>
             <p className="font-medium text-foreground text-sm">ความคืบหน้าเทียบวันเก็บเกี่ยวเป้าหมาย</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {hybrid.mode === "FIXED_DATE" && hybrid.daysToHarvest != null
-                ? hybrid.daysToHarvest > 0
-                  ? `ถึงเก็บเกี่ยวเป้าหมายอีก ${hybrid.daysToHarvest} วัน`
-                  : hybrid.daysToHarvest === 0
-                    ? "ถึงวันเก็บเกี่ยวเป้าหมายวันนี้"
-                    : `เลยวันเก็บเกี่ยวเป้าหมายแล้ว ${-hybrid.daysToHarvest} วัน`
-                : Math.max(0, hybrid.totalCycleDays - hybrid.daysSincePlant) > 0
-                  ? `อีก ${Math.max(0, hybrid.totalCycleDays - hybrid.daysSincePlant)} วันถึงเก็บเกี่ยว (DAS)`
-                  : "ครบวงจรตามอายุพันธุ์"}
+              {progressPercent < 100
+                ? `อีก ${Math.round((100 - progressPercent) / 100 * (activePlot.tasks.length > 0 ? Math.max(...activePlot.tasks.map(t => t.day)) - Math.min(...activePlot.tasks.map(t => t.day)) : 0))} วันถึงเก็บเกี่ยว`
+                : "ครบวงจรตามอายุพันธุ์"}
             </p>
           </Card>
 
           <Card className="p-6 rounded-2xl border border-slate-100 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-            <p className="text-sm text-muted-foreground mb-1">งานที่ต้องทำ (30 วัน)</p>
+            <p className="text-sm text-muted-foreground mb-1">งานที่กำลังจะมาถึง</p>
             <p className="text-3xl font-bold text-emerald-600 tracking-tight">
               {upcomingTasks.length}
             </p>
@@ -246,20 +232,18 @@ export default function PlotDashboard() {
                   }`}
                 >
                   <p className="text-xs text-muted-foreground">
-                    {s.startDay < 0
-                      ? `ก่อนเอาข้าวลงนา ${Math.abs(s.startDay)} วัน`
-                      : s.startDay === 0
-                      ? "วันเอาข้าวลงนา"
-                      : `หลังเอาข้าวลงนา ${s.startDay} วัน`}
+                    {format(new Date(`${sStartISO}T00:00:00`), "d MMM yyyy", { locale: th })}
+                    {sStartISO !== sEndISO && ` – ${format(new Date(`${sEndISO}T00:00:00`), "d MMM yyyy", { locale: th })}`}
                   </p>
                   <p className="font-semibold mt-1 text-sm text-foreground">{s.name}</p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {format(new Date(`${sStartISO}T00:00:00`), "d MMM yyyy", { locale: th })} –{" "}
-                    {format(new Date(`${sEndISO}T00:00:00`), "d MMM yyyy", { locale: th })}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    งานที่กำหนด: {sTasks.length > 0 ? sTasks.map((t) => t.taskName).join(", ") : "-"}
-                  </p>
+                  {sTasks.map((t) => (
+                    <div key={t.id} className="mt-2">
+                      <p className="text-xs text-muted-foreground">งาน: {t.taskName}</p>
+                      {t.description && (
+                        <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{t.description}</p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               );
             })}
@@ -269,7 +253,7 @@ export default function PlotDashboard() {
         {/* Smart Checklist */}
         <Card className="p-6 rounded-2xl border border-slate-100 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-            <h3 className="text-base font-semibold text-foreground">งานที่ต้องทำ (30 วันข้างหน้า)</h3>
+            <h3 className="text-base font-semibold text-foreground">{upcomingLabel}</h3>
             <Badge variant="secondary" className="w-fit bg-emerald-50 text-emerald-700 border-0 text-sm">
               {upcomingTasks.filter((t) => t.isCompleted).length}/{upcomingTasks.length} ทำเสร็จ
             </Badge>
@@ -277,7 +261,7 @@ export default function PlotDashboard() {
 
           {upcomingTasks.length === 0 ? (
             <p className="text-muted-foreground text-sm py-4 text-center">
-              ไม่มีงานที่ต้องทำใน 30 วันถัดไป หรือทำครบแล้ว
+              ไม่มีงานที่ต้องทำ หรือทำครบแล้ว
             </p>
           ) : (
             <ul className="space-y-2">
@@ -324,17 +308,41 @@ export default function PlotDashboard() {
           )}
         </Card>
 
+        {/* Resources */}
+        {activePlot.resources && (
+          <Card className="p-6 rounded-2xl border border-slate-100 bg-white">
+            <h3 className="text-base font-semibold text-foreground mb-4">วัสดุที่ต้องเตรียม</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-emerald-50 rounded-xl p-4 text-center">
+                <p className="text-2xl font-bold text-emerald-700">{activePlot.resources.seedKg}</p>
+                <p className="text-xs text-muted-foreground mt-1">เมล็ดพันธุ์ (กก.)</p>
+              </div>
+              <div className="bg-amber-50 rounded-xl p-4 text-center">
+                <p className="text-2xl font-bold text-amber-700">{activePlot.resources.fertilizer1Kg}</p>
+                <p className="text-xs text-muted-foreground mt-1">ปุ๋ยครั้งที่ 1 (กก.)</p>
+                <p className="text-xs font-mono text-amber-600 mt-0.5">{activePlot.resources.fertilizer1Formula}</p>
+              </div>
+              <div className="bg-amber-50 rounded-xl p-4 text-center">
+                <p className="text-2xl font-bold text-amber-700">{activePlot.resources.fertilizer2Kg}</p>
+                <p className="text-xs text-muted-foreground mt-1">ปุ๋ยครั้งที่ 2 (กก.)</p>
+                <p className="text-xs font-mono text-amber-600 mt-0.5">{activePlot.resources.fertilizer2Formula}</p>
+              </div>
+              {activePlot.resources.seedlingTrays != null && (
+                <div className="bg-sky-50 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-sky-700">{activePlot.resources.seedlingTrays}</p>
+                  <p className="text-xs text-muted-foreground mt-1">ถาดเพาะกล้า (ถาด)</p>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
+
         {/* Optional growth progress bar (visual) */}
         <Card className="p-6 rounded-2xl border border-slate-100 bg-white">
           <p className="text-sm text-muted-foreground mb-2">ความคืบหน้า</p>
-          <p className="text-sm text-foreground mb-3">{hybrid.plotSummaryLine}</p>
           <div className="flex justify-between text-xs text-muted-foreground mb-2">
-            <span>ผ่านไปแล้ว {hybrid.daysSincePlant} วัน (นับจากวันปลูก)</span>
-            <span>
-              {hybrid.mode === "FIXED_DATE" && hybrid.harvestDateISO
-                ? `เก็บเกี่ยวเป้าหมาย ${hybrid.harvestDateISO}`
-                : `รอบรวม ~${hybrid.totalCycleDays} วัน`}
-            </span>
+            <span>ผ่านไปแล้ว {daysSinceStart} วัน</span>
+            <span>รอบรวม ~{activePlot.tasks.length > 0 ? Math.max(...activePlot.tasks.map(t => t.day)) - Math.min(...activePlot.tasks.map(t => t.day)) : 0} วัน</span>
           </div>
           <Progress value={progressPercent} className="h-2" />
         </Card>

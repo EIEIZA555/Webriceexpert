@@ -11,6 +11,15 @@ export interface PlanTask {
   isCompleted: boolean;
 }
 
+export interface PlanResources {
+  seedKg: number;
+  fertilizer1Kg: number;
+  fertilizer1Formula: string;
+  fertilizer2Kg: number;
+  fertilizer2Formula: string;
+  seedlingTrays: number | null;
+}
+
 export interface PlantingPlan {
   id: string;
   varietyId: string;
@@ -19,8 +28,8 @@ export interface PlantingPlan {
   areaRai: number;
   plotName: string | null;
   plantingMethod: PlantingMethodKey;
+  soilType: SoilTypeKey;
   tasks: PlanTask[];
+  resources: PlanResources | null;
   createdAt: string;
-  /** ถ้ามีจาก backend — ใช้ใน RAG context */
-  soilType?: SoilTypeKey;
 }

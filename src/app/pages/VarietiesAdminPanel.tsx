@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, Sprout, Lock } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Plus, Pencil, Trash2, Sprout } from "lucide-react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -22,193 +22,174 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
-import { useVarieties } from "../contexts/VarietiesContext";
-import type { RiceSeasonType, RiceVarietyRecord, ScheduleMode } from "../lib/riceVarietyTypes";
-import { RICE_SEASON_LABELS } from "../lib/riceVarietyTypes";
-import { validateRiceVarietyRecord } from "../lib/varietyValidation";
+import { apiFetch } from "../lib/api";
 
-const emptyStages = (): RiceVarietyRecord["stages"] => [
-  { name: "ระยะกล้า", startDay: 0, endDay: 20 },
-  { name: "ระยะแตกกอ", startDay: 21, endDay: 45 },
-  { name: "ระยะรับท้อง", startDay: 46, endDay: 70 },
-  { name: "ระยะออกดอกและสุกแก่", startDay: 71, endDay: 95 },
+interface Variety {
+  id: string;
+  name: string;
+  collection_name: string;
+  harvest_age_days: number;
+  is_photoperiod_sensitive: boolean;
+  supported_methods: string[];
+  description: string | null;
+  reference_url: string | null;
+  tillering_day: number | null;
+  panicle_initiation_day: number | null;
+  heading_day: number | null;
+  fert1_rate_min: number | null;
+  fert1_rate_max: number | null;
+  fert2_rate_min: number | null;
+  fert2_rate_max: number | null;
+  fert1_formula: string | null;
+  fert2_formula: string | null;
+  fert1_note: string | null;
+  fert2_note: string | null;
+}
+
+const METHODS = [
+  { key: "transplant", label: "นาดำ" },
+  { key: "broadcast", label: "นาหว่าน" },
+  { key: "throw", label: "นาโยน" },
 ];
 
-const emptyFixedMilestones = (): NonNullable<RiceVarietyRecord["fixedMilestones"]> => [
-  { name: "ระยะรับท้อง (ใส่ปุ๋ยรอบ 2)", daysBeforeHarvest: 60 },
-  { name: "ระยะออกดอก", daysBeforeHarvest: 30 },
-  { name: "ระยะพลับพลึง", daysBeforeHarvest: 7 },
-  { name: "ระยะเก็บเกี่ยว", daysBeforeHarvest: 0 },
-];
+const emptyForm = (): Partial<Variety> => ({
+  name: "",
+  collection_name: "",
+  harvest_age_days: 120,
+  is_photoperiod_sensitive: false,
+  supported_methods: ["transplant", "broadcast"],
+  description: "",
+  reference_url: "",
+  tillering_day: undefined,
+  panicle_initiation_day: undefined,
+  heading_day: undefined,
+  fert1_rate_min: undefined,
+  fert1_rate_max: undefined,
+  fert2_rate_min: undefined,
+  fert2_rate_max: undefined,
+  fert1_formula: "16-20-0",
+  fert2_formula: "46-0-0",
+  fert1_note: "",
+  fert2_note: "",
+});
 
-export default function VarietiesAdminPanel() {
-  const { varieties, addVariety, updateVariety, deleteVariety } = useVarieties();
+export default function VarietiesAdminPanel({ onCountChange }: { onCountChange?: (n: number) => void }) {
+  const [varieties, setVarieties] = useState<Variety[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<RiceVarietyRecord | null>(null);
-  const [form, setForm] = useState<Partial<RiceVarietyRecord>>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Variety | null>(null);
+  const [form, setForm] = useState<Partial<Variety>>(emptyForm());
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const sorted = useMemo(
-    () => [...varieties].sort((a, b) => a.name.localeCompare(b.name, "th")),
-    [varieties],
-  );
+  const load = () => {
+    apiFetch<Variety[]>("/varieties/", {}, false).then((data) => {
+      setVarieties(data);
+      onCountChange?.(data.length);
+    }).catch(() => {});
+  };
+
+  useEffect(() => { load(); }, []);
 
   const openNew = () => {
     setEditing(null);
-    setForm({
-      id: "",
-      name: "",
-      seasonType: "naprang",
-      photoperiodSensitive: false,
-      totalDays: 95,
-      stages: emptyStages(),
-      isDefault: false,
-      scheduleMode: "DAS_BASED",
-      harvestMonthDay: "11-25",
-      fixedMilestones: emptyFixedMilestones(),
-    });
-    setFormError(null);
+    setForm(emptyForm());
+    setError(null);
     setDialogOpen(true);
   };
 
-  const openEdit = (v: RiceVarietyRecord) => {
+  const openEdit = (v: Variety) => {
     setEditing(v);
-    setForm({
-      ...v,
-      stages: v.stages.map((s) => ({ ...s })),
-      scheduleMode: v.scheduleMode ?? "DAS_BASED",
-      harvestMonthDay: v.harvestMonthDay,
-      fixedMilestones: v.fixedMilestones?.map((m) => ({ ...m })) ?? emptyFixedMilestones(),
-    });
-    setFormError(null);
+    setForm({ ...v });
+    setError(null);
     setDialogOpen(true);
+    setTimeout(() => scrollRef.current?.scrollTo(0, 0), 50);
   };
 
-  const applyTotalToLastStage = (total: number, stages: RiceVarietyRecord["stages"]) => {
-    if (!stages.length) return stages;
-    const next = stages.map((s, i) =>
-      i === stages.length - 1 ? { ...s, endDay: total } : { ...s },
-    );
-    return next;
+  const toggleMethod = (key: string) => {
+    const current = form.supported_methods ?? [];
+    setForm((f) => ({
+      ...f,
+      supported_methods: current.includes(key)
+        ? current.filter((m) => m !== key)
+        : [...current, key],
+    }));
   };
 
-  const handleSave = () => {
-    const totalDays = Number(form.totalDays);
-    const mode = (form.scheduleMode ?? "DAS_BASED") as ScheduleMode;
-    const stages =
-      editing && editing.isDefault
-        ? (form.stages as RiceVarietyRecord["stages"])
-        : applyTotalToLastStage(totalDays, (form.stages ?? []) as RiceVarietyRecord["stages"]);
+  const handleSave = async () => {
+    if (!form.name?.trim()) { setError("กรุณากรอกชื่อพันธุ์"); return; }
+    if (!editing && !form.collection_name?.trim()) { setError("กรุณากรอกรหัสพันธุ์"); return; }
+    if (!form.supported_methods?.length) { setError("เลือกวิธีปลูกอย่างน้อย 1 แบบ"); return; }
 
-    const draft: RiceVarietyRecord = {
-      id: (form.id ?? "").trim(),
-      name: (form.name ?? "").trim(),
-      seasonType: (form.seasonType ?? "naprang") as RiceSeasonType,
-      photoperiodSensitive: !!form.photoperiodSensitive,
-      totalDays,
-      stages,
-      isDefault: editing?.isDefault ?? false,
-      scheduleMode: mode,
-      ...(mode === "FIXED_DATE"
-        ? {
-            harvestMonthDay: (form.harvestMonthDay ?? "").trim(),
-            fixedMilestones: (form.fixedMilestones ?? emptyFixedMilestones()).map((m) => ({
-              name: m.name.trim(),
-              daysBeforeHarvest: Number(m.daysBeforeHarvest),
-            })),
-          }
-        : {
-            harvestMonthDay: undefined,
-            fixedMilestones: undefined,
-          }),
-    };
+    setSaving(true);
+    setError(null);
+    try {
+      const body = {
+        name: form.name,
+        collection_name: form.collection_name,
+        harvest_age_days: form.harvest_age_days,
+        is_photoperiod_sensitive: form.is_photoperiod_sensitive,
+        supported_methods: form.supported_methods,
+        description: form.description || null,
+        reference_url: form.reference_url || null,
+        tillering_day: form.tillering_day ?? null,
+        panicle_initiation_day: form.panicle_initiation_day ?? null,
+        heading_day: form.heading_day ?? null,
+        fert1_rate_min: form.fert1_rate_min ?? null,
+        fert1_rate_max: form.fert1_rate_max ?? null,
+        fert2_rate_min: form.fert2_rate_min ?? null,
+        fert2_rate_max: form.fert2_rate_max ?? null,
+        fert1_formula: form.fert1_formula || null,
+        fert2_formula: form.fert2_formula || null,
+        fert1_note: form.fert1_note || null,
+        fert2_note: form.fert2_note || null,
+      };
 
-    const err = validateRiceVarietyRecord(draft);
-    if (err) {
-      setFormError(err);
-      return;
-    }
-
-    if (editing) {
-      if (editing.isDefault) {
-        const u = updateVariety(editing.id, {
-          name: draft.name,
-          totalDays: draft.totalDays,
-          stages: draft.stages,
-          seasonType: draft.seasonType,
-          photoperiodSensitive: draft.photoperiodSensitive,
-          scheduleMode: draft.scheduleMode,
-          harvestMonthDay: draft.harvestMonthDay,
-          fixedMilestones: draft.fixedMilestones,
-        });
-        if (u) {
-          setFormError(u);
-          return;
-        }
+      if (editing) {
+        await apiFetch(`/varieties/${editing.id}`, { method: "PUT", body: JSON.stringify(body) }, true);
       } else {
-        const u = updateVariety(editing.id, draft);
-        if (u) {
-          setFormError(u);
-          return;
-        }
+        await apiFetch("/varieties/", { method: "POST", body: JSON.stringify(body) }, true);
       }
-    } else {
-      const u = addVariety({
-        id: draft.id,
-        name: draft.name,
-        seasonType: draft.seasonType,
-        photoperiodSensitive: draft.photoperiodSensitive,
-        totalDays: draft.totalDays,
-        stages: draft.stages,
-        scheduleMode: draft.scheduleMode,
-        harvestMonthDay: draft.harvestMonthDay,
-        fixedMilestones: draft.fixedMilestones,
-      });
-      if (u) {
-        setFormError(u);
-        return;
-      }
+      load();
+      setDialogOpen(false);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
     }
-    setDialogOpen(false);
   };
 
-  const updateStage = (index: number, patch: Partial<RiceVarietyRecord["stages"][0]>) => {
-    const stages = [...((form.stages ?? []) as RiceVarietyRecord["stages"])];
-    stages[index] = { ...stages[index], ...patch };
-    setForm((f) => ({ ...f, stages }));
+  const handleDelete = async (id: string) => {
+    try {
+      await apiFetch(`/varieties/${id}`, { method: "DELETE" }, true);
+      load();
+    } catch (e) {
+      alert((e as Error).message);
+    }
   };
 
-  const updateFixedMilestone = (
-    index: number,
-    patch: Partial<{ name: string; daysBeforeHarvest: number }>,
-  ) => {
-    const list = [...(form.fixedMilestones ?? emptyFixedMilestones())];
-    list[index] = { ...list[index], ...patch };
-    setForm((f) => ({ ...f, fixedMilestones: list }));
-  };
+  const num = (v: number | null | undefined) => (v == null ? "" : String(v));
+  const setNum = (key: keyof Variety, val: string) =>
+    setForm((f) => ({ ...f, [key]: val === "" ? null : Number(val) }));
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <h3 className="font-medium flex-1">พันธุ์ข้าว (เก็บในเบราว์เซอร์)</h3>
+        <h3 className="font-medium flex-1">พันธุ์ข้าว ({varieties.length})</h3>
         <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl" onClick={openNew}>
           <Plus className="w-4 h-4 mr-2" />
           เพิ่มพันธุ์ข้าวใหม่
         </Button>
       </div>
-      <p className="text-sm text-muted-foreground">
-        พันธุ์ข้าวที่สร้างจะถูกใช้ในการสร้างแผนงาน และรายงาน
-      </p>
+
+      {varieties.length === 0 && (
+        <Card className="p-8 rounded-xl text-center text-muted-foreground text-sm">
+          ยังไม่มีพันธุ์ข้าวในระบบ
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {sorted.map((v) => (
+        {varieties.map((v) => (
           <Card key={v.id} className="p-5 rounded-2xl border border-slate-100 bg-white shadow-sm">
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="flex items-center gap-2 min-w-0">
@@ -217,216 +198,234 @@ export default function VarietiesAdminPanel() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-semibold text-foreground truncate">{v.name}</p>
-                  <p className="text-xs text-muted-foreground font-mono">{v.id}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{v.collection_name}</p>
                 </div>
               </div>
-              {v.isDefault && (
-                <span className="text-xs flex items-center gap-1 text-muted-foreground shrink-0">
-                  <Lock className="w-3.5 h-3.5" /> ค่าเริ่มต้น
-                </span>
-              )}
             </div>
-            <p className="text-sm text-muted-foreground mb-3">
-              {v.scheduleMode === "FIXED_DATE" ? "วันเก็บเกี่ยวคงที่ (ย้อนหลัง)" : "DAS จากวันปลูก"} •{" "}
-              {RICE_SEASON_LABELS[v.seasonType]} • {v.photoperiodSensitive ? "ไวต่อแสง" : "ไม่ไวต่อแสง"} •{" "}
-              {v.totalDays} วัน • {v.stages.length} ระยะ (DAS)
+            <p className="text-sm text-muted-foreground mb-1">
+              {v.is_photoperiod_sensitive ? "ไวต่อแสง" : "ไม่ไวต่อแสง"} • {v.harvest_age_days} วัน
             </p>
+            <p className="text-xs text-muted-foreground mb-2">
+              วิธีปลูก: {v.supported_methods.map((m) => METHODS.find((x) => x.key === m)?.label ?? m).join(", ")}
+            </p>
+            {(v.tillering_day || v.panicle_initiation_day || v.heading_day) && (
+              <p className="text-xs text-muted-foreground mb-2">
+                แตกกอ: {v.tillering_day ?? "-"} วัน • ตั้งท้อง: {v.panicle_initiation_day ?? "-"} วัน • ออกรวง: {v.heading_day ?? "-"} วัน
+              </p>
+            )}
+            {(v.fert1_rate_min || v.fert2_rate_min) && (
+              <p className="text-xs text-muted-foreground mb-3">
+                ปุ๋ย 1: {v.fert1_rate_min ?? "-"}–{v.fert1_rate_max ?? "-"} กก./ไร่ •{" "}
+                ปุ๋ย 2: {v.fert2_rate_min ?? "-"}–{v.fert2_rate_max ?? "-"} กก./ไร่
+              </p>
+            )}
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="rounded-lg" onClick={() => openEdit(v)}>
-                <Pencil className="w-4 h-4 mr-1" />
-                {v.isDefault ? "ดู/แก้ไข" : "แก้ไข"}
+                <Pencil className="w-4 h-4 mr-1" />แก้ไข
               </Button>
-              {!v.isDefault && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="rounded-lg text-destructive">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>ลบพันธุ์ {v.name}?</AlertDialogTitle>
-                      <AlertDialogDescription>การลบจะไม่สามารถกู้คืนได้</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => deleteVariety(v.id)}
-                        className="bg-destructive text-destructive-foreground"
-                      >
-                        ลบ
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="rounded-lg text-destructive">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>ลบพันธุ์ {v.name}?</AlertDialogTitle>
+                    <AlertDialogDescription>การลบจะไม่สามารถกู้คืนได้</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleDelete(v.id)} className="bg-destructive text-destructive-foreground">
+                      ลบ
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </Card>
         ))}
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editing ? (editing.isDefault ? "แก้ไขพันธุ์เริ่มต้น" : "แก้ไขพันธุ์") : "เพิ่มพันธุ์ข้าวใหม่"}</DialogTitle>
+        <DialogContent className="w-[90vw] max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
+            <DialogTitle>{editing ? "แก้ไขพันธุ์ข้าว" : "เพิ่มพันธุ์ข้าวใหม่"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            {formError && <p className="text-sm text-red-600">{formError}</p>}
-            <div>
-              <Label>รหัสพันธุ์ (slug / collection)</Label>
-              <Input
-                className="mt-1 rounded-lg"
-                value={form.id ?? ""}
-                disabled={!!editing}
-                onChange={(e) => setForm((f) => ({ ...f, id: e.target.value }))}
-                placeholder="เช่น my_rice_01"
-              />
+
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+            {error && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+
+            {/* ข้อมูลพื้นฐาน */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className={editing ? "col-span-2" : ""}>
+                {!editing && (
+                  <>
+                    <Label>รหัสพันธุ์</Label>
+                    <Input
+                      className="mt-1 rounded-lg font-mono"
+                      placeholder="เช่น jasmine, rd43, kk15"
+                      value={form.collection_name ?? ""}
+                      onChange={(e) => setForm((f) => ({ ...f, collection_name: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">ตัวอักษรภาษาอังกฤษพิมพ์เล็ก ไม่มีช่องว่าง ใช้สำหรับเชื่อมกับฐานความรู้</p>
+                  </>
+                )}
+              </div>
+              <div className="col-span-2">
+                <Label>ชื่อพันธุ์ข้าว</Label>
+                <Input className="mt-1 rounded-lg" value={form.name ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+              </div>
             </div>
-            <div>
-              <Label>ชื่อพันธุ์ข้าว</Label>
-              <Input
-                className="mt-1 rounded-lg"
-                value={form.name ?? ""}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>ประเภทนา</Label>
-                <Select
-                  value={form.seasonType ?? "naprang"}
-                  onValueChange={(v) => setForm((f) => ({ ...f, seasonType: v as RiceSeasonType }))}
-                >
-                  <SelectTrigger className="mt-1 rounded-lg">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="napee">{RICE_SEASON_LABELS.napee}</SelectItem>
-                    <SelectItem value="naprang">{RICE_SEASON_LABELS.naprang}</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>อายุเก็บเกี่ยว (วัน)</Label>
+                <Input type="number" min={1} className="mt-1 rounded-lg"
+                  value={num(form.harvest_age_days)}
+                  onChange={(e) => setNum("harvest_age_days", e.target.value)} />
               </div>
               <div>
                 <Label>ไวต่อช่วงแสง</Label>
-                <Select
-                  value={form.photoperiodSensitive ? "yes" : "no"}
-                  onValueChange={(v) => setForm((f) => ({ ...f, photoperiodSensitive: v === "yes" }))}
+                <select
+                  className="mt-1 w-full h-10 rounded-lg border border-input bg-background px-3 text-sm"
+                  value={form.is_photoperiod_sensitive ? "yes" : "no"}
+                  onChange={(e) => setForm((f) => ({ ...f, is_photoperiod_sensitive: e.target.value === "yes" }))}
                 >
-                  <SelectTrigger className="mt-1 rounded-lg">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="yes">ไวต่อช่วงแสง</SelectItem>
-                    <SelectItem value="no">ไม่ไวต่อช่วงแสง</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <option value="no">ไม่ไวต่อแสง</option>
+                  <option value="yes">ไวต่อแสง</option>
+                </select>
               </div>
             </div>
+
             <div>
-              <Label>โหมดตารางเวลา</Label>
-              <Select
-                value={form.scheduleMode ?? "DAS_BASED"}
-                onValueChange={(v) => setForm((f) => ({ ...f, scheduleMode: v as ScheduleMode }))}
-              >
-                <SelectTrigger className="mt-1 rounded-lg">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DAS_BASED">DAS จากวันปลูก (พันธุ์ไม่ไวแสง / กำหนดเอง)</SelectItem>
-                  <SelectItem value="FIXED_DATE">วันเก็บเกี่ยวคงที่ (ย้อนหลังจากวันเก็บเกี่ยว)</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>วิธีปลูกที่รองรับ</Label>
+              <div className="flex gap-4 mt-2">
+                {METHODS.map((m) => (
+                  <label key={m.key} className="flex items-center gap-1.5 cursor-pointer text-sm">
+                    <input type="checkbox"
+                      className="accent-emerald-600 w-4 h-4 cursor-pointer"
+                      checked={form.supported_methods?.includes(m.key) ?? false}
+                      onChange={() => toggleMethod(m.key)} />
+                    {m.label}
+                  </label>
+                ))}
+              </div>
             </div>
-            {(form.scheduleMode ?? "DAS_BASED") === "FIXED_DATE" && (
-              <>
+
+            {/* ระยะการเจริญเติบโต */}
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium mb-3">ระยะการเจริญเติบโต (วันนับจากวันปลูก)</p>
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <Label>วันเก็บเกี่ยวคงที่ (MM-DD)</Label>
-                  <Input
-                    className="mt-1 rounded-lg font-mono"
-                    placeholder="11-25"
-                    value={form.harvestMonthDay ?? ""}
-                    onChange={(e) => setForm((f) => ({ ...f, harvestMonthDay: e.target.value }))}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">เช่น 25 พ.ย. = 11-25</p>
+                  <Label className="text-xs">วันแตกกอ</Label>
+                  <Input type="number" min={0} className="mt-1 rounded-lg" placeholder="เช่น 20"
+                    value={num(form.tillering_day)}
+                    onChange={(e) => setNum("tillering_day", e.target.value)} />
                 </div>
                 <div>
-                  <Label>Milestone ย้อนจากวันเก็บเกี่ยว (วันก่อนเก็บเกี่ยว)</Label>
-                  <div className="mt-2 space-y-2">
-                    {(form.fixedMilestones ?? emptyFixedMilestones()).map((m, i) => (
-                      <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_6rem] gap-2 items-end">
-                        <Input
-                          placeholder="ชื่อ milestone"
-                          value={m.name}
-                          onChange={(e) => updateFixedMilestone(i, { name: e.target.value })}
-                          className="rounded-lg"
-                        />
-                        <Input
-                          type="number"
-                          min={0}
-                          placeholder="วันก่อนเก็บ"
-                          value={m.daysBeforeHarvest}
-                          onChange={(e) =>
-                            updateFixedMilestone(i, { daysBeforeHarvest: Number(e.target.value) })
-                          }
-                          className="rounded-lg"
-                        />
-                      </div>
-                    ))}
+                  <Label className="text-xs">วันกำเนิดช่อดอก</Label>
+                  <Input type="number" min={0} className="mt-1 rounded-lg" placeholder="เช่น 50"
+                    value={num(form.panicle_initiation_day)}
+                    onChange={(e) => setNum("panicle_initiation_day", e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs">วันออกรวง</Label>
+                  <Input type="number" min={0} className="mt-1 rounded-lg" placeholder="เช่น 75"
+                    value={num(form.heading_day)}
+                    onChange={(e) => setNum("heading_day", e.target.value)} />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1.5">ถ้าไม่กรอก ระบบจะคำนวณอัตโนมัติจากอายุเก็บเกี่ยว</p>
+            </div>
+
+            {/* ปุ๋ย */}
+            <div className="border-t pt-4 space-y-4">
+              <p className="text-sm font-medium">ปุ๋ย</p>
+
+              {/* ปุ๋ยครั้งที่ 1 */}
+              <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">ปุ๋ยครั้งที่ 1</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs">อัตราต่ำสุด (กก./ไร่)</Label>
+                    <Input type="number" min={0} className="mt-1 rounded-lg bg-white" placeholder="เช่น 25"
+                      value={num(form.fert1_rate_min)}
+                      onChange={(e) => setNum("fert1_rate_min", e.target.value)} />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ต้องมีรายการที่วันก่อนเก็บ = 0 (วันเก็บเกี่ยว)
-                  </p>
+                  <div>
+                    <Label className="text-xs">อัตราสูงสุด (กก./ไร่)</Label>
+                    <Input type="number" min={0} className="mt-1 rounded-lg bg-white" placeholder="เช่น 35"
+                      value={num(form.fert1_rate_max)}
+                      onChange={(e) => setNum("fert1_rate_max", e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">สูตรปุ๋ย</Label>
+                    <Input className="mt-1 rounded-lg bg-white" placeholder="16-20-0"
+                      value={form.fert1_formula ?? ""}
+                      onChange={(e) => setForm((f) => ({ ...f, fert1_formula: e.target.value }))} />
+                  </div>
                 </div>
-              </>
-            )}
-            <div>
-              <Label>อายุเก็บเกี่ยว (วัน) — ใช้กราฟ / DAS</Label>
-              <Input
-                type="number"
-                min={1}
-                className="mt-1 rounded-lg"
-                value={form.totalDays ?? ""}
-                onChange={(e) => setForm((f) => ({ ...f, totalDays: Number(e.target.value) }))}
-              />
-            </div>
-            {(form.scheduleMode ?? "DAS_BASED") === "DAS_BASED" && (
-              <div>
-                <Label>ช่วง DAS ต่อ milestone (เรียงต่อเนื่อง — ระยะสุดท้ายต้องจบที่อายุเก็บเกี่ยว)</Label>
-                <div className="mt-2 space-y-2">
-                  {((form.stages ?? []) as RiceVarietyRecord["stages"]).map((s, i) => (
-                    <div key={i} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
-                      <Input
-                        placeholder="ชื่อระยะ"
-                        value={s.name}
-                        onChange={(e) => updateStage(i, { name: e.target.value })}
-                        className="rounded-lg"
-                      />
-                      <Input
-                        type="number"
-                        placeholder="DAS เริ่ม"
-                        value={s.startDay}
-                        onChange={(e) => updateStage(i, { startDay: Number(e.target.value) })}
-                        className="rounded-lg"
-                      />
-                      <Input
-                        type="number"
-                        placeholder="DAS จบ"
-                        value={s.endDay}
-                        onChange={(e) => updateStage(i, { endDay: Number(e.target.value) })}
-                        className="rounded-lg"
-                      />
-                    </div>
-                  ))}
+                <div>
+                  <Label className="text-xs">หมายเหตุ</Label>
+                  <Input className="mt-1 rounded-lg bg-white" placeholder="เช่น ใส่หลังปักดำ 20 วัน"
+                    value={form.fert1_note ?? ""}
+                    onChange={(e) => setForm((f) => ({ ...f, fert1_note: e.target.value }))} />
                 </div>
               </div>
-            )}
+
+              {/* ปุ๋ยครั้งที่ 2 */}
+              <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">ปุ๋ยครั้งที่ 2</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs">อัตราต่ำสุด (กก./ไร่)</Label>
+                    <Input type="number" min={0} className="mt-1 rounded-lg bg-white" placeholder="เช่น 10"
+                      value={num(form.fert2_rate_min)}
+                      onChange={(e) => setNum("fert2_rate_min", e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">อัตราสูงสุด (กก./ไร่)</Label>
+                    <Input type="number" min={0} className="mt-1 rounded-lg bg-white" placeholder="เช่น 15"
+                      value={num(form.fert2_rate_max)}
+                      onChange={(e) => setNum("fert2_rate_max", e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">สูตรปุ๋ย</Label>
+                    <Input className="mt-1 rounded-lg bg-white" placeholder="46-0-0"
+                      value={form.fert2_formula ?? ""}
+                      onChange={(e) => setForm((f) => ({ ...f, fert2_formula: e.target.value }))} />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs">หมายเหตุ</Label>
+                  <Input className="mt-1 rounded-lg bg-white" placeholder="เช่น ใส่ช่วงกำเนิดช่อดอก"
+                    value={form.fert2_note ?? ""}
+                    onChange={(e) => setForm((f) => ({ ...f, fert2_note: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+
+            {/* เพิ่มเติม */}
+            <div className="border-t pt-4 space-y-3">
+              <div>
+                <Label className="text-xs">คำอธิบาย (ไม่บังคับ)</Label>
+                <Input className="mt-1 rounded-lg" value={form.description ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">URL อ้างอิง (ไม่บังคับ)</Label>
+                <Input className="mt-1 rounded-lg" value={form.reference_url ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, reference_url: e.target.value }))} />
+              </div>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              ปิด
-            </Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSave}>
-              บันทึก
+
+          <DialogFooter className="px-6 py-4 border-t shrink-0">
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>ปิด</Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSave} disabled={saving}>
+              {saving ? "กำลังบันทึก..." : "บันทึก"}
             </Button>
           </DialogFooter>
         </DialogContent>

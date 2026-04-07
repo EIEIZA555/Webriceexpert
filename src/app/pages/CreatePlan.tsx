@@ -6,19 +6,14 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { ArrowLeft, Check, Leaf, Search } from "lucide-react";
 import { usePlans } from "../contexts/PlansContext";
-import { useVarieties } from "../contexts/VarietiesContext";
-import { PLANTING_METHODS, plantingDateFromPlanStartDate, type PlantingMethodKey } from "../lib/plantingMethod";
-import { resolveHarvestDateForSeason, shouldWarnLatePlantingFixed } from "../lib/hybridSchedule";
+import { PLANTING_METHODS, type PlantingMethodKey } from "../lib/plantingMethod";
 import { apiFetch } from "../lib/api";
-import { RICE_SEASON_LABELS } from "../lib/riceVarietyTypes";
 
 export default function CreatePlan() {
   const navigate = useNavigate();
-  const { createPlan, isVarietyRegisteredOnBackend } = usePlans();
-  const { varieties } = useVarieties();
+  const { createPlan } = usePlans();
   const [step, setStep] = useState(1);
-  /** รองรับวิธีปลูกจาก GET /varieties/ (slug เดียวกับ id พันธุ์) */
-  const [methodByCollection, setMethodByCollection] = useState<Record<string, string[]>>({});
+  const [varieties, setVarieties] = useState<{ id: string; name: string; supported_methods: string[] }[]>([]);
 
   const [formData, setFormData] = useState({
     variety: "",
@@ -26,28 +21,23 @@ export default function CreatePlan() {
     landSize: "",
     plotName: "",
     plantingMethod: "" as PlantingMethodKey | "",
+    soilType: "clay" as "clay" | "loam" | "sandy",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [varietyQuery, setVarietyQuery] = useState("");
 
   useEffect(() => {
-    apiFetch<Array<{ collection_name: string; supported_methods: string[] }>>("/varieties/")
+    apiFetch<Array<{ collection_name: string; name: string; supported_methods: string[] }>>("/varieties/")
       .then((rows) => {
-        const o: Record<string, string[]> = {};
-        rows.forEach((r) => {
-          o[r.collection_name] = r.supported_methods;
-        });
-        setMethodByCollection(o);
+        setVarieties(rows.map((r) => ({ id: r.collection_name, name: r.name, supported_methods: r.supported_methods })));
       })
       .catch(() => {});
   }, []);
 
   const selectedVariety = varieties.find((v) => v.id === formData.variety);
 
-  const methodsForCollection = formData.variety
-    ? methodByCollection[formData.variety]
-    : undefined;
+  const methodsForCollection = selectedVariety?.supported_methods;
   const availableMethods =
     selectedVariety && methodsForCollection?.length
       ? PLANTING_METHODS.filter((m) => methodsForCollection.includes(m.key))
@@ -57,31 +47,9 @@ export default function CreatePlan() {
     const q = varietyQuery.trim().toLowerCase();
     if (!q) return varieties;
     return varieties.filter(
-      (v) =>
-        v.name.toLowerCase().includes(q) ||
-        v.id.toLowerCase().includes(q) ||
-        RICE_SEASON_LABELS[v.seasonType].toLowerCase().includes(q),
+      (v) => v.name.toLowerCase().includes(q) || v.id.toLowerCase().includes(q),
     );
   }, [varietyQuery, varieties]);
-
-  const fixedLatePlantingWarning = useMemo(() => {
-    const v = selectedVariety;
-    if (
-      !v ||
-      v.scheduleMode !== "FIXED_DATE" ||
-      !v.harvestMonthDay ||
-      !formData.plantDate ||
-      !formData.plantingMethod
-    ) {
-      return false;
-    }
-    const plantingISO = plantingDateFromPlanStartDate(
-      formData.plantDate,
-      formData.plantingMethod as PlantingMethodKey,
-    );
-    const harvestISO = resolveHarvestDateForSeason(plantingISO, v.harvestMonthDay);
-    return shouldWarnLatePlantingFixed(plantingISO, harvestISO);
-  }, [selectedVariety, formData.plantDate, formData.plantingMethod]);
 
   const displayVarieties = useMemo(() => {
     const selected = varieties.find((v) => v.id === formData.variety);
@@ -104,17 +72,13 @@ export default function CreatePlan() {
     setIsLoading(true);
     setError(null);
     try {
-      if (!isVarietyRegisteredOnBackend(formData.variety)) {
-        throw new Error(
-          "พันธุ์นี้ยังไม่ลงทะเบียนในระบบหลังบ้าน — สร้างแผนไม่ได้ โปรดเลือกพันธุ์ที่มีใน API หรือเพิ่มพันธุ์ที่เซิร์ฟเวอร์ก่อน",
-        );
-      }
       await createPlan({
         varietyId: formData.variety,
         startDate: formData.plantDate,
         plotName: formData.plotName,
         landSize: formData.landSize,
         plantingMethod: formData.plantingMethod as PlantingMethodKey,
+        soilType: formData.soilType,
       });
       navigate("/app/plots");
     } catch (e) {
@@ -226,9 +190,7 @@ export default function CreatePlan() {
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {displayVarieties.map((variety) => {
-                      const onBackend = isVarietyRegisteredOnBackend(variety.id);
-                      return (
+                    {displayVarieties.map((variety) => (
                       <button
                         key={variety.id}
                         type="button"
@@ -250,20 +212,10 @@ export default function CreatePlan() {
                           )}
                         </div>
                         <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed line-clamp-3">
-                          {RICE_SEASON_LABELS[variety.seasonType]} •{" "}
-                          {variety.photoperiodSensitive ? "ไวต่อช่วงแสง" : "ไม่ไวต่อช่วงแสง"} • DAS สูงสุด{" "}
-                          {variety.totalDays} วัน
-                        </p>
-                        <p className="text-xs mt-1.5">
-                          {onBackend ? (
-                            <span className="text-emerald-700">ลงทะเบียนระบบ — สร้างแผนได้</span>
-                          ) : (
-                            <span className="text-amber-700">ยังไม่พบใน API — สร้างแผนไม่ได้จนกว่าจะลงทะเบียน</span>
-                          )}
+                          {variety.supported_methods.map((m) => PLANTING_METHODS.find((p) => p.key === m)?.label ?? m).join(", ")}
                         </p>
                       </button>
-                    );
-                    })}
+                    ))}
                   </div>
                 )}
               </div>
@@ -327,17 +279,32 @@ export default function CreatePlan() {
                   />
                 </div>
 
-                {fixedLatePlantingWarning && (
-                  <div
-                    className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
-                    role="status"
-                  >
-                    <p className="font-medium text-amber-900">คำเตือน</p>
-                    <p className="mt-1 text-amber-900/90">
-                      ปลูกช้าเกินไป อาจส่งผลต่อผลผลิต เนื่องจากข้าวจะออกดอกตามฤดูกาล (พันธุ์กำหนดวันเก็บเกี่ยวคงที่)
-                    </p>
+
+                <div>
+                  <Label className="mb-3 block">ประเภทดิน</Label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {([
+                      { key: "clay", label: "ดินเหนียว", desc: "ปุ๋ย 16-20-0" },
+                      { key: "loam", label: "ดินร่วน", desc: "ปุ๋ย 16-16-8" },
+                      { key: "sandy", label: "ดินทราย", desc: "ปุ๋ย 16-16-8" },
+                    ] as const).map((s) => (
+                      <button
+                        key={s.key}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, soilType: s.key })}
+                        className={`p-3 rounded-xl border-2 text-left transition-all hover:border-primary/50 ${
+                          formData.soilType === s.key ? "border-primary bg-primary/5" : "border-border"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-1">
+                          <span className="font-medium text-sm">{s.label}</span>
+                          {formData.soilType === s.key && <Check className="w-4 h-4 text-primary shrink-0" />}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{s.desc}</p>
+                      </button>
+                    ))}
                   </div>
-                )}
+                </div>
 
                 <div>
                   <Label className="mb-3 block">วิธีการปลูก</Label>
@@ -376,10 +343,10 @@ export default function CreatePlan() {
                   <h4 className="text-sm mb-2">สรุปแผนของคุณ</h4>
                   <div className="text-sm space-y-1 text-muted-foreground">
                     <p>• พันธุ์ข้าว: {selectedVariety?.name ?? "-"}</p>
-                    <p>• อายุเก็บเกี่ยว: {selectedVariety?.totalDays ?? "-"} วัน</p>
                     <p>• วันที่ปลูก: {formData.plantDate}</p>
                     <p>• ชื่อแปลง: {formData.plotName || "-"}</p>
                     <p>• ขนาดพื้นที่: {formData.landSize || "-"} ไร่</p>
+                    <p>• ประเภทดิน: {{ clay: "ดินเหนียว", loam: "ดินร่วน", sandy: "ดินทราย" }[formData.soilType]}</p>
                     <p>
                       • วิธีปลูก:{" "}
                       {PLANTING_METHODS.find((m) => m.key === formData.plantingMethod)?.label ?? "-"}

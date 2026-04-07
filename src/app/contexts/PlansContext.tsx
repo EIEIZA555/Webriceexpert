@@ -1,11 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { getCurrentStage } from "../lib/planGenerator";
-import { useVarieties } from "./VarietiesContext";
-import type { PlanTask, PlantingPlan } from "../lib/planTypes";
-import { PLANTING_DAY_OFFSET_FROM_PLAN_START, type PlantingMethodKey } from "../lib/plantingMethod";
+import type { PlanTask, PlantingPlan, PlanResources } from "../lib/planTypes";
+import { type PlantingMethodKey } from "../lib/plantingMethod";
 import { apiFetch, getAuthToken } from "../lib/api";
 
-export type { PlanTask, PlantingPlan } from "../lib/planTypes";
+export type { PlanTask, PlantingPlan, PlanResources } from "../lib/planTypes";
 export type { PlantingMethodKey } from "../lib/plantingMethod";
 
 const CURRENT_PLAN_KEY = "rice_expert_current_plan_id";
@@ -29,7 +27,9 @@ interface BackendPlan {
   area_rai: number;
   plot_name: string | null;
   planting_method: string;
+  soil_type: string;
   tasks: BackendTask[];
+  resources: { seed_kg: number; fertilizer1_kg: number; fertilizer1_formula: string; fertilizer2_kg: number; fertilizer2_formula: string; seedling_trays: number | null } | null;
   created_at: string;
 }
 
@@ -65,7 +65,16 @@ function mapPlan(p: BackendPlan, uuidToCollection: Map<string, string>): Plantin
     areaRai: p.area_rai,
     plotName: p.plot_name,
     plantingMethod: p.planting_method as PlantingMethodKey,
+    soilType: (p.soil_type ?? "clay") as import("../lib/planGenerator").SoilTypeKey,
     tasks: p.tasks.map(mapTask),
+    resources: p.resources ? {
+      seedKg: p.resources.seed_kg,
+      fertilizer1Kg: p.resources.fertilizer1_kg,
+      fertilizer1Formula: p.resources.fertilizer1_formula,
+      fertilizer2Kg: p.resources.fertilizer2_kg,
+      fertilizer2Formula: p.resources.fertilizer2_formula,
+      seedlingTrays: p.resources.seedling_trays,
+    } : null,
     createdAt: p.created_at,
   };
 }
@@ -83,6 +92,7 @@ interface PlansContextValue {
     plotName: string;
     landSize: string;
     plantingMethod: PlantingMethodKey;
+    soilType: string;
   }) => Promise<PlantingPlan>;
   toggleTask: (planId: string, taskId: string) => Promise<void>;
   deletePlan: (planId: string) => Promise<void>;
@@ -93,12 +103,13 @@ interface PlansContextValue {
   getUpcomingTasks: (daysAhead?: number) => PlanTask[];
   /** มีพันธุ์นี้ใน backend (สร้างแผนได้) */
   isVarietyRegisteredOnBackend: (collectionName: string) => boolean;
+  /** รีเฟรช collectionToUUID map จาก backend */
+  refreshVarieties: () => Promise<{ uuidMap: Map<string, string>; colMap: Map<string, string> }>;
 }
 
 const PlansContext = createContext<PlansContextValue | null>(null);
 
 export function PlansProvider({ children }: { children: React.ReactNode }) {
-  const { varietyConfigs } = useVarieties();
   const [plans, setPlans] = useState<PlantingPlan[]>([]);
   const [uuidToCollection, setUuidToCollection] = useState<Map<string, string>>(new Map());
   const [collectionToUUID, setCollectionToUUID] = useState<Map<string, string>>(new Map());
@@ -152,6 +163,19 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
     setCurrentPlanIdState(id);
   }, []);
 
+  const refreshVarieties = useCallback(async (): Promise<{ uuidMap: Map<string, string>; colMap: Map<string, string> }> => {
+    const varieties = await apiFetch<BackendVariety[]>("/varieties/");
+    const uuidMap = new Map<string, string>();
+    const colMap = new Map<string, string>();
+    varieties.forEach((v) => {
+      uuidMap.set(v.id, v.collection_name);
+      colMap.set(v.collection_name, v.id);
+    });
+    setUuidToCollection(uuidMap);
+    setCollectionToUUID(colMap);
+    return { uuidMap, colMap };
+  }, []);
+
   const createPlan = useCallback(
     async (params: {
       varietyId: string;
@@ -159,16 +183,12 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
       plotName: string;
       landSize: string;
       plantingMethod: PlantingMethodKey;
+      soilType: string;
     }) => {
-      const varietyUUID = collectionToUUID.get(params.varietyId);
+      // Fetch fresh varieties เพื่อหลีกเลี่ยง stale closure
+      const { uuidMap, colMap } = await refreshVarieties();
+      const varietyUUID = colMap.get(params.varietyId);
       if (!varietyUUID) throw new Error(`ไม่พบพันธุ์ข้าว: ${params.varietyId}`);
-
-      // แปลงวันเริ่มต้นที่ user เลือก → วันปลูกจริง (day 0)
-      // เพราะ task แรกเริ่มก่อนวันปลูก (เช่น เตรียมกล้า 25 วันก่อนปักดำ)
-      const offset = PLANTING_DAY_OFFSET_FROM_PLAN_START[params.plantingMethod];
-      const [y, m, d] = params.startDate.split("-").map(Number);
-      const plantingDate = new Date(y, m - 1, d + offset);
-      const plantingDateStr = `${plantingDate.getFullYear()}-${String(plantingDate.getMonth() + 1).padStart(2, "0")}-${String(plantingDate.getDate()).padStart(2, "0")}`;
 
       const backendPlan = await apiFetch<BackendPlan>(
         "/plans/",
@@ -176,21 +196,22 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
           method: "POST",
           body: JSON.stringify({
             variety_id: varietyUUID,
-            start_date: plantingDateStr,
+            start_date: params.startDate,
             area_rai: parseFloat(params.landSize),
             plot_name: params.plotName || null,
             planting_method: params.plantingMethod,
+            soil_type: params.soilType,
           }),
         },
         true,
       );
 
-      const newPlan = mapPlan(backendPlan, uuidToCollection);
+      const newPlan = mapPlan(backendPlan, uuidMap);
       setPlans((prev) => [...prev, newPlan]);
       setCurrentPlanId(newPlan.id);
       return newPlan;
     },
-    [collectionToUUID, uuidToCollection, setCurrentPlanId],
+    [refreshVarieties, setCurrentPlanId],
   );
 
   const toggleTask = useCallback(async (planId: string, taskId: string) => {
@@ -252,10 +273,12 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
   };
 
   const getCurrentStageName = () => {
-    if (!plan) return null;
-    return (
-      getCurrentStage(plan.varietyId, getDaysSinceStart(), varietyConfigs) ?? "เก็บเกี่ยวแล้ว"
-    );
+    if (!plan || !plan.tasks.length) return null;
+    const das = getDaysSinceStart();
+    const minDay = Math.min(...plan.tasks.map(t => t.day));
+    const currentDay = das + minDay;
+    const sorted = [...plan.tasks].sort((a, b) => Math.abs(a.day - currentDay) - Math.abs(b.day - currentDay));
+    return sorted[0]?.stage ?? "เก็บเกี่ยวแล้ว";
   };
 
   const isVarietyRegisteredOnBackend = useCallback(
@@ -269,13 +292,23 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
     today.setHours(0, 0, 0, 0);
     const future = new Date(today);
     future.setDate(future.getDate() + daysAhead);
-    return plan.tasks
+    const inWindow = plan.tasks
       .filter((t) => {
         const d = new Date(t.date);
         d.setHours(0, 0, 0, 0);
         return d >= today && d <= future;
       })
       .sort((a, b) => a.date.localeCompare(b.date));
+    if (inWindow.length > 0) return inWindow;
+    // ถ้าแผนยังไม่เริ่ม หรือไม่มีงานใน window — แสดง 5 งานถัดไปที่ใกล้ที่สุด
+    return plan.tasks
+      .filter((t) => {
+        const d = new Date(t.date);
+        d.setHours(0, 0, 0, 0);
+        return d >= today;
+      })
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 5);
   };
 
   return (
@@ -296,6 +329,7 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
         getCurrentStageName,
         getUpcomingTasks,
         isVarietyRegisteredOnBackend,
+        refreshVarieties,
       }}
     >
       {children}

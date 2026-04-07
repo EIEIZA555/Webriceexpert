@@ -3,9 +3,7 @@ import { MessageCircle, X, Sprout, SendHorizonal } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { isAuthenticated } from "../lib/auth";
 import { usePlans } from "../contexts/PlansContext";
-import { getCurrentStage } from "../lib/planGenerator";
-import { buildRagContextPack } from "../lib/fixedPlan";
-import { useVarieties } from "../contexts/VarietiesContext";
+import { getPlantingMethodLabel } from "../lib/plantingMethod";
 
 const formatTime = (date: Date) =>
   date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
@@ -57,8 +55,7 @@ function toDisplayUserQuestion(storedQuestion: string): string {
 }
 
 export function FloatingChat() {
-  const { plan, getDaysSinceStart, getCurrentStageName } = usePlans();
-  const { varietyConfigs } = useVarieties();
+  const { plan, getDaysSinceStart, getCurrentStageName, getUpcomingTasks } = usePlans();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [inputMessage, setInputMessage] = useState("");
@@ -111,18 +108,19 @@ export function FloatingChat() {
       if (!plan) return inputMessage;
 
       const das = getDaysSinceStart();
-      const stage =
-        getCurrentStageName() ??
-        getCurrentStage(plan.varietyId, das, varietyConfigs) ??
-        "ไม่ระบุระยะ";
-      // PRD: fixedPlanSnapshot + fertilizerRules + activePlotId ในแพ็กเก็ตเดียว (ส่งเป็นข้อความ — API เดิมไม่เปลี่ยน)
-      const pack = buildRagContextPack(plan, das, varietyConfigs);
+      const stage = getCurrentStageName() ?? "ไม่ระบุระยะ";
+      const upcomingTasks = getUpcomingTasks(7);
+      const upcomingText = upcomingTasks.length > 0
+        ? upcomingTasks.map(t => `- ${t.taskName} (${t.date})`).join("\n")
+        : "ไม่มีงานใน 7 วันข้างหน้า";
       const contextPrefix =
-        `${pack}\n` +
-        `สรุปย่อสำหรับอ่านเร็ว: ${plan.plotName ?? "แปลง"} | ${plan.varietyName} | DAS ${das} | ระยะหลัก: ${stage}\n` +
-        `คำสั่ง: กรุณา “อธิบายเฉพาะข้อมูลตามแต่ละระยะ” หรือ “ตอบโดยอ้างอิงจากเอกสาร PDF ในคู่มือ (RAG)” เท่านั้น ` +
-        `ห้ามคิด/แนะนำการวางแผนใหม่หรือปรับไทม์ไลน์จากเดิม\n` +
-        `รูปแบบคำตอบ: เน้นใช้ได้จริง — ระบุว่าควรทำวันไหน (อ้าง DAS/วันที่จากบริบท) และทำอย่างไรสั้น ๆ ตามคู่มือ ไม่ใช่ทฤษฎีอย่างเดียว\n\n` +
+        `[บริบทแปลงนาของผู้ใช้]\n` +
+        `พันธุ์: ${plan.varietyName}\n` +
+        `วิธีปลูก: ${getPlantingMethodLabel(plan.plantingMethod)}\n` +
+        `วันที่ปลูก: ${plan.startDate}\n` +
+        `ผ่านมาแล้ว: ${das} วัน\n` +
+        `ระยะปัจจุบัน: ${stage}\n` +
+        `งานใน 7 วันข้างหน้า:\n${upcomingText}\n\n` +
         `คำถาม: `;
 
       return contextPrefix + inputMessage;
@@ -192,7 +190,7 @@ export function FloatingChat() {
       )}
 
       {isOpen && (
-        <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[400px] sm:h-[600px] w-full h-full sm:max-h-[85vh] bg-white sm:rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden border-0 sm:border border-primary/20">
+        <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[480px] sm:h-[640px] w-full h-full sm:max-h-[88vh] bg-white sm:rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden border-0 sm:border border-primary/20">
           {/* Header */}
           <div className="bg-primary text-white px-4 py-3.5 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3 min-w-0">
@@ -290,14 +288,19 @@ export function FloatingChat() {
           {/* Input */}
           <div className="shrink-0 p-4 pt-3 bg-white border-t border-slate-100">
             <div className="flex gap-2 items-end">
-              <input
-                type="text"
+              <textarea
                 value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
+                onChange={(e) => {
+                  setInputMessage(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = Math.min(e.target.scrollHeight, window.innerHeight * 0.4) + "px";
+                }}
                 onKeyDown={handleKeyPress}
-                placeholder="พิมพ์คำถามเกี่ยวกับโรคข้าว..."
+                placeholder="พิมพ์คำถามเกี่ยวกับการปลูกข้าว... (Shift+Enter ขึ้นบรรทัดใหม่)"
                 disabled={isLoading}
-                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 focus:bg-white transition-colors disabled:opacity-60"
+                rows={1}
+                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 focus:bg-white transition-colors disabled:opacity-60 resize-none overflow-hidden leading-relaxed"
+                style={{ minHeight: "44px", maxHeight: "40vh" }}
               />
               <button
                 type="button"
@@ -317,7 +320,7 @@ export function FloatingChat() {
                 )}
               </button>
             </div>
-            <p className="text-[11px] text-slate-400 mt-2 text-center">กด Enter เพื่อส่ง</p>
+            <p className="text-[11px] text-slate-400 mt-2 text-center">Enter ส่ง • Shift+Enter ขึ้นบรรทัดใหม่</p>
           </div>
         </div>
       )}

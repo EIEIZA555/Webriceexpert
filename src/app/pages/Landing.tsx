@@ -200,14 +200,19 @@ export default function Landing() {
             {/* Input */}
             <div className="p-4 border-t border-border">
               <div className="flex gap-2 items-end">
-                <input
-                  type="text"
+                <textarea
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    e.target.style.height = "auto";
+                    e.target.style.height = Math.min(e.target.scrollHeight, window.innerHeight * 0.4) + "px";
+                  }}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-                  placeholder="พิมพ์คำถามเกี่ยวกับการปลูกข้าว..."
+                  placeholder="พิมพ์คำถามเกี่ยวกับการปลูกข้าว... (Shift+Enter ขึ้นบรรทัดใหม่)"
                   disabled={isLoading}
-                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 focus:bg-white transition-colors disabled:opacity-60"
+                  rows={1}
+                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 focus:bg-white transition-colors disabled:opacity-60 resize-none overflow-hidden leading-relaxed"
+                  style={{ minHeight: "44px", maxHeight: "40vh" }}
                 />
                 <button
                   type="button"
