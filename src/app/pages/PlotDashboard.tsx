@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Progress } from "../components/ui/progress";
 import { Badge } from "../components/ui/badge";
 import {
   Calendar,
@@ -202,53 +201,34 @@ export default function PlotDashboard() {
           </Card>
         </div>
 
-        {/* Milestones */}
-        <Card className="p-6 rounded-2xl border border-slate-100 bg-white">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div>
-              <h3 className="text-base font-semibold text-foreground">ระยะการเจริญเติบโต</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                ช่วงวันของแต่ละระยะตามพันธุ์
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Sprout className="w-4 h-4 text-emerald-600" />
-              <span>{activePlot.varietyName}</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
-            {stages.map((s) => {
-              const isCurrent = currentDayRelativeToPanting >= s.startDay && currentDayRelativeToPanting <= s.endDay;
-              const sStartISO = addDaysToISODate(activePlot.startDate, s.startDay);
-              const sEndISO = addDaysToISODate(activePlot.startDate, s.endDay);
-              const sTasks = s.tasks;
-
-              return (
-                <div
-                  key={s.name}
-                  className={`p-4 rounded-xl border transition-colors ${
-                    isCurrent ? "bg-emerald-50/70 border-emerald-200" : "bg-slate-50/40 border-slate-100"
-                  }`}
-                >
-                  <p className="text-xs text-muted-foreground">
-                    {format(new Date(`${sStartISO}T00:00:00`), "d MMM yyyy", { locale: th })}
-                    {sStartISO !== sEndISO && ` – ${format(new Date(`${sEndISO}T00:00:00`), "d MMM yyyy", { locale: th })}`}
-                  </p>
-                  <p className="font-semibold mt-1 text-sm text-foreground">{s.name}</p>
-                  {sTasks.map((t) => (
-                    <div key={t.id} className="mt-2">
-                      <p className="text-xs text-muted-foreground">งาน: {t.taskName}</p>
-                      {t.description && (
-                        <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{t.description}</p>
-                      )}
-                    </div>
-                  ))}
+        {/* Resources */}
+        {activePlot.resources && (
+          <Card className="p-6 rounded-2xl border border-slate-100 bg-white">
+            <h3 className="text-base font-semibold text-foreground mb-4">วัสดุที่ต้องเตรียม</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-emerald-50 rounded-xl p-4 text-center">
+                <p className="text-2xl font-bold text-emerald-700">{activePlot.resources.seedKg}</p>
+                <p className="text-xs text-muted-foreground mt-1">เมล็ดพันธุ์ (กก.)</p>
+              </div>
+              <div className="bg-amber-50 rounded-xl p-4 text-center">
+                <p className="text-2xl font-bold text-amber-700">{activePlot.resources.fertilizer1Kg}</p>
+                <p className="text-xs text-muted-foreground mt-1">ปุ๋ยครั้งที่ 1 (กก.)</p>
+                <p className="text-xs font-mono text-amber-600 mt-0.5">{activePlot.resources.fertilizer1Formula}</p>
+              </div>
+              <div className="bg-amber-50 rounded-xl p-4 text-center">
+                <p className="text-2xl font-bold text-amber-700">{activePlot.resources.fertilizer2Kg}</p>
+                <p className="text-xs text-muted-foreground mt-1">ปุ๋ยครั้งที่ 2 (กก.)</p>
+                <p className="text-xs font-mono text-amber-600 mt-0.5">{activePlot.resources.fertilizer2Formula}</p>
+              </div>
+              {activePlot.resources.seedlingTrays != null && (
+                <div className="bg-sky-50 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-sky-700">{activePlot.resources.seedlingTrays}</p>
+                  <p className="text-xs text-muted-foreground mt-1">ถาดเพาะกล้า (ถาด)</p>
                 </div>
-              );
-            })}
-          </div>
-        </Card>
+              )}
+            </div>
+          </Card>
+        )}
 
         {/* Smart Checklist */}
         <Card className="p-6 rounded-2xl border border-slate-100 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
@@ -308,44 +288,54 @@ export default function PlotDashboard() {
           )}
         </Card>
 
-        {/* Resources */}
-        {activePlot.resources && (
-          <Card className="p-6 rounded-2xl border border-slate-100 bg-white">
-            <h3 className="text-base font-semibold text-foreground mb-4">วัสดุที่ต้องเตรียม</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-emerald-50 rounded-xl p-4 text-center">
-                <p className="text-2xl font-bold text-emerald-700">{activePlot.resources.seedKg}</p>
-                <p className="text-xs text-muted-foreground mt-1">เมล็ดพันธุ์ (กก.)</p>
-              </div>
-              <div className="bg-amber-50 rounded-xl p-4 text-center">
-                <p className="text-2xl font-bold text-amber-700">{activePlot.resources.fertilizer1Kg}</p>
-                <p className="text-xs text-muted-foreground mt-1">ปุ๋ยครั้งที่ 1 (กก.)</p>
-                <p className="text-xs font-mono text-amber-600 mt-0.5">{activePlot.resources.fertilizer1Formula}</p>
-              </div>
-              <div className="bg-amber-50 rounded-xl p-4 text-center">
-                <p className="text-2xl font-bold text-amber-700">{activePlot.resources.fertilizer2Kg}</p>
-                <p className="text-xs text-muted-foreground mt-1">ปุ๋ยครั้งที่ 2 (กก.)</p>
-                <p className="text-xs font-mono text-amber-600 mt-0.5">{activePlot.resources.fertilizer2Formula}</p>
-              </div>
-              {activePlot.resources.seedlingTrays != null && (
-                <div className="bg-sky-50 rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-sky-700">{activePlot.resources.seedlingTrays}</p>
-                  <p className="text-xs text-muted-foreground mt-1">ถาดเพาะกล้า (ถาด)</p>
-                </div>
-              )}
-            </div>
-          </Card>
-        )}
-
-        {/* Optional growth progress bar (visual) */}
+        {/* Milestones */}
         <Card className="p-6 rounded-2xl border border-slate-100 bg-white">
-          <p className="text-sm text-muted-foreground mb-2">ความคืบหน้า</p>
-          <div className="flex justify-between text-xs text-muted-foreground mb-2">
-            <span>ผ่านไปแล้ว {daysSinceStart} วัน</span>
-            <span>รอบรวม ~{activePlot.tasks.length > 0 ? Math.max(...activePlot.tasks.map(t => t.day)) - Math.min(...activePlot.tasks.map(t => t.day)) : 0} วัน</span>
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h3 className="text-base font-semibold text-foreground">ระยะการเจริญเติบโต</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                ช่วงวันของแต่ละระยะตามพันธุ์
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Sprout className="w-4 h-4 text-emerald-600" />
+              <span>{activePlot.varietyName}</span>
+            </div>
           </div>
-          <Progress value={progressPercent} className="h-2" />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+            {stages.map((s) => {
+              const isCurrent = currentDayRelativeToPanting >= s.startDay && currentDayRelativeToPanting <= s.endDay;
+              const sStartISO = addDaysToISODate(activePlot.startDate, s.startDay);
+              const sEndISO = addDaysToISODate(activePlot.startDate, s.endDay);
+              const sTasks = s.tasks;
+
+              return (
+                <div
+                  key={s.name}
+                  className={`p-4 rounded-xl border transition-colors ${
+                    isCurrent ? "bg-emerald-50/70 border-emerald-200" : "bg-slate-50/40 border-slate-100"
+                  }`}
+                >
+                  <p className="text-xs text-muted-foreground">
+                    {format(new Date(`${sStartISO}T00:00:00`), "d MMM yyyy", { locale: th })}
+                    {sStartISO !== sEndISO && ` – ${format(new Date(`${sEndISO}T00:00:00`), "d MMM yyyy", { locale: th })}`}
+                  </p>
+                  <p className="font-semibold mt-1 text-sm text-foreground">{s.name}</p>
+                  {sTasks.map((t) => (
+                    <div key={t.id} className="mt-2">
+                      <p className="text-xs text-muted-foreground">งาน: {t.taskName}</p>
+                      {t.description && (
+                        <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{t.description}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
         </Card>
+
       </motion.div>
     </div>
   );

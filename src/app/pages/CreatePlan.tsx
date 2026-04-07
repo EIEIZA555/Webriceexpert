@@ -74,7 +74,7 @@ export default function CreatePlan() {
     try {
       await createPlan({
         varietyId: formData.variety,
-        startDate: formData.plantDate,
+        startDate: formData.plantDate, // เก็บเป็น yyyy-mm-dd เสมอ
         plotName: formData.plotName,
         landSize: formData.landSize,
         plantingMethod: formData.plantingMethod as PlantingMethodKey,
@@ -224,13 +224,13 @@ export default function CreatePlan() {
 
           {step === 2 && (
             <div>
-              <h2 className="text-2xl mb-2">วันที่เริ่มปลูก</h2>
+              <h2 className="text-2xl mb-2">วันที่เริ่มเตรียมงาน</h2>
               <p className="text-muted-foreground mb-6">
-                เลือกวันที่ปลูกจริง — เช่น วันปักดำ วันหว่าน หรือวันโยนกล้า
+                เลือกวันที่คุณต้องการเริ่มทำกิจกรรมแรก — เช่น วันที่เริ่มไถดะ หรือวันที่เริ่มแช่เมล็ดพันธุ์
               </p>
               <div className="max-w-md">
                 <Label htmlFor="plantDate" className="mb-2 block">
-                  วันที่ปลูก
+                  วันที่เริ่มเตรียมงาน
                 </Label>
                 <Input
                   id="plantDate"
@@ -240,7 +240,7 @@ export default function CreatePlan() {
                   className="rounded-lg bg-input-background border-border h-12"
                 />
                 <p className="text-sm text-muted-foreground mt-2">
-                  ระบบจะคำนวณแผนการดูแลตามวันที่คุณเลือก
+                  ระบบจะคำนวณวันลงปลูกจริงและการดูแลต่างๆ ให้สัมพันธ์กับวันที่คุณเริ่มเตรียมงาน
                 </p>
               </div>
             </div>
