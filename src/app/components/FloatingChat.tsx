@@ -109,17 +109,30 @@ export function FloatingChat() {
 
       const das = getDaysSinceStart();
       const stage = getCurrentStageName() ?? "ไม่ระบุระยะ";
-      const upcomingTasks = getUpcomingTasks(7);
+      const today = new Date().toISOString().slice(0, 10);
+
+      // งานที่กำลังทำอยู่วันนี้
+      const todayTasks = plan.tasks.filter(t => t.date.slice(0, 10) === today);
+      const todayText = todayTasks.length > 0
+        ? todayTasks.map(t => `- ${t.taskName}: ${t.description}`).join("\n")
+        : "ไม่มีงานวันนี้";
+
+      // งานถัดไป 7 วัน (ไม่รวมวันนี้)
+      const upcomingTasks = getUpcomingTasks(7).filter(t => t.date.slice(0, 10) !== today);
       const upcomingText = upcomingTasks.length > 0
-        ? upcomingTasks.map(t => `- ${t.taskName} (${t.date})`).join("\n")
+        ? upcomingTasks.map(t => `- ${t.taskName} (${t.date}): ${t.description}`).join("\n")
         : "ไม่มีงานใน 7 วันข้างหน้า";
+
       const contextPrefix =
         `[บริบทแปลงนาของผู้ใช้]\n` +
         `พันธุ์: ${plan.varietyName}\n` +
         `วิธีปลูก: ${getPlantingMethodLabel(plan.plantingMethod)}\n` +
-        `วันที่ปลูก: ${plan.startDate}\n` +
+        `พื้นที่: ${plan.areaRai} ไร่\n` +
+        `ประเภทดิน: ${plan.soilType}\n` +
+        `วันที่เริ่มแผน: ${plan.startDate}\n` +
         `ผ่านมาแล้ว: ${das} วัน\n` +
         `ระยะปัจจุบัน: ${stage}\n` +
+        `งานวันนี้:\n${todayText}\n` +
         `งานใน 7 วันข้างหน้า:\n${upcomingText}\n\n` +
         `คำถาม: `;
 
@@ -148,7 +161,7 @@ export function FloatingChat() {
         }));
       const data = await apiFetch<ChatResponse>("/chat/", {
         method: "POST",
-        body: JSON.stringify({ question, history }),
+        body: JSON.stringify({ question, history, collection: plan?.varietyId ?? null }),
       }, true);
 
       setMessages((prev) => [...prev, {
