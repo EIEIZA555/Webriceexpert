@@ -55,9 +55,9 @@ const METHODS = [
 const emptyForm = (): Partial<Variety> => ({
   name: "",
   collection_name: "",
-  harvest_age_days: 120,
-  is_photoperiod_sensitive: false,
-  supported_methods: ["transplant", "broadcast"],
+  harvest_age_days: undefined,
+  is_photoperiod_sensitive: undefined,
+  supported_methods: [],
   description: "",
   reference_url: "",
   tillering_day: undefined,
@@ -67,13 +67,20 @@ const emptyForm = (): Partial<Variety> => ({
   fert1_rate_max: undefined,
   fert2_rate_min: undefined,
   fert2_rate_max: undefined,
-  fert1_formula: "16-20-0",
-  fert2_formula: "46-0-0",
+  fert1_formula: "",
+  fert2_formula: "",
   fert1_note: "",
   fert2_note: "",
 });
 
-export default function VarietiesAdminPanel({ onCountChange }: { onCountChange?: (n: number) => void }) {
+export default function VarietiesAdminPanel({
+  onCountChange,
+  onVarietiesMutated,
+}: {
+  onCountChange?: (n: number) => void;
+  /** เรียกเมื่อรายการพันธุ์เปลี่ยน (เพิ่ม/แก้/ลบ) เพื่อให้แท็บอื่น เช่น เอกสาร รีเฟรช collection จาก API */
+  onVarietiesMutated?: () => void;
+}) {
   const [varieties, setVarieties] = useState<Variety[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Variety | null>(null);
@@ -119,6 +126,14 @@ export default function VarietiesAdminPanel({ onCountChange }: { onCountChange?:
   const handleSave = async () => {
     if (!form.name?.trim()) { setError("กรุณากรอกชื่อพันธุ์"); return; }
     if (!editing && !form.collection_name?.trim()) { setError("กรุณากรอกรหัสพันธุ์"); return; }
+    if (form.harvest_age_days == null || Number(form.harvest_age_days) < 1) {
+      setError("กรุณากรอกอายุเก็บเกี่ยว (วัน)");
+      return;
+    }
+    if (form.is_photoperiod_sensitive === undefined) {
+      setError("กรุณาเลือกว่าไวต่อช่วงแสงหรือไม่");
+      return;
+    }
     if (!form.supported_methods?.length) { setError("เลือกวิธีปลูกอย่างน้อย 1 แบบ"); return; }
 
     setSaving(true);
@@ -127,8 +142,8 @@ export default function VarietiesAdminPanel({ onCountChange }: { onCountChange?:
       const body = {
         name: form.name,
         collection_name: form.collection_name,
-        harvest_age_days: form.harvest_age_days,
-        is_photoperiod_sensitive: form.is_photoperiod_sensitive,
+        harvest_age_days: Number(form.harvest_age_days),
+        is_photoperiod_sensitive: Boolean(form.is_photoperiod_sensitive),
         supported_methods: form.supported_methods,
         description: form.description || null,
         reference_url: form.reference_url || null,
@@ -151,6 +166,7 @@ export default function VarietiesAdminPanel({ onCountChange }: { onCountChange?:
         await apiFetch("/varieties/", { method: "POST", body: JSON.stringify(body) }, true);
       }
       load();
+      onVarietiesMutated?.();
       setDialogOpen(false);
     } catch (e) {
       setError((e as Error).message);
@@ -163,6 +179,7 @@ export default function VarietiesAdminPanel({ onCountChange }: { onCountChange?:
     try {
       await apiFetch(`/varieties/${id}`, { method: "DELETE" }, true);
       load();
+      onVarietiesMutated?.();
     } catch (e) {
       alert((e as Error).message);
     }
@@ -274,25 +291,47 @@ export default function VarietiesAdminPanel({ onCountChange }: { onCountChange?:
               </div>
               <div className="col-span-2">
                 <Label>ชื่อพันธุ์ข้าว</Label>
-                <Input className="mt-1 rounded-lg" value={form.name ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+                <Input
+                  className="mt-1 rounded-lg"
+                  placeholder="เช่น ข้าวหอมมะลิ 105"
+                  value={form.name ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>อายุเก็บเกี่ยว (วัน)</Label>
-                <Input type="number" min={1} className="mt-1 rounded-lg"
+                <Input
+                  type="number"
+                  min={1}
+                  className="mt-1 rounded-lg"
+                  placeholder="เช่น 120"
                   value={num(form.harvest_age_days)}
-                  onChange={(e) => setNum("harvest_age_days", e.target.value)} />
+                  onChange={(e) => setNum("harvest_age_days", e.target.value)}
+                />
               </div>
               <div>
                 <Label>ไวต่อช่วงแสง</Label>
                 <select
                   className="mt-1 w-full h-10 rounded-lg border border-input bg-background px-3 text-sm"
-                  value={form.is_photoperiod_sensitive ? "yes" : "no"}
-                  onChange={(e) => setForm((f) => ({ ...f, is_photoperiod_sensitive: e.target.value === "yes" }))}
+                  value={
+                    form.is_photoperiod_sensitive === undefined
+                      ? ""
+                      : form.is_photoperiod_sensitive
+                        ? "yes"
+                        : "no"
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm((f) => ({
+                      ...f,
+                      is_photoperiod_sensitive: v === "" ? undefined : v === "yes",
+                    }));
+                  }}
                 >
+                  {!editing && <option value="">เลือก…</option>}
                   <option value="no">ไม่ไวต่อแสง</option>
                   <option value="yes">ไวต่อแสง</option>
                 </select>
@@ -411,13 +450,21 @@ export default function VarietiesAdminPanel({ onCountChange }: { onCountChange?:
             <div className="border-t pt-4 space-y-3">
               <div>
                 <Label className="text-xs">คำอธิบาย (ไม่บังคับ)</Label>
-                <Input className="mt-1 rounded-lg" value={form.description ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+                <Input
+                  className="mt-1 rounded-lg"
+                  placeholder="เช่น ลักษณะเด่น การปลูกที่เหมาะ"
+                  value={form.description ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                />
               </div>
               <div>
                 <Label className="text-xs">URL อ้างอิง (ไม่บังคับ)</Label>
-                <Input className="mt-1 rounded-lg" value={form.reference_url ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, reference_url: e.target.value }))} />
+                <Input
+                  className="mt-1 rounded-lg"
+                  placeholder="https://…"
+                  value={form.reference_url ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, reference_url: e.target.value }))}
+                />
               </div>
             </div>
           </div>

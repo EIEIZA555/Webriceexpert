@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -22,6 +22,7 @@ import { TaskGlyph } from "../lib/taskIcons";
 export default function PlotDashboard() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [taskView, setTaskView] = useState<"upcoming" | "all">("upcoming");
 
   const {
     plans,
@@ -232,59 +233,103 @@ export default function PlotDashboard() {
 
         {/* Smart Checklist */}
         <Card className="p-6 rounded-2xl border border-slate-100 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-            <h3 className="text-base font-semibold text-foreground">{upcomingLabel}</h3>
-            <Badge variant="secondary" className="w-fit bg-emerald-50 text-emerald-700 border-0 text-sm">
-              {upcomingTasks.filter((t) => t.isCompleted).length}/{upcomingTasks.length} ทำเสร็จ
-            </Badge>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+            <div>
+              <div className="flex items-center gap-3">
+                <h3 className="text-base font-semibold text-foreground">รายการงาน (Checklist)</h3>
+                <Badge variant="secondary" className="w-fit bg-emerald-50 text-emerald-700 border-0 text-xs">
+                  {upcomingTasks.filter((t) => t.isCompleted).length}/{upcomingTasks.length} ช่วงนี้เสร็จแล้ว
+                </Badge>
+              </div>
+            </div>
+            
+            <div className="flex bg-slate-100/80 p-1 rounded-xl shrink-0">
+              <button
+                onClick={() => setTaskView("upcoming")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  taskView === "upcoming"
+                    ? "bg-white text-emerald-700 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                งานช่วงนี้ (30 วัน)
+              </button>
+              <button
+                onClick={() => setTaskView("all")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  taskView === "all"
+                    ? "bg-white text-emerald-700 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                งานทั้งหมด
+              </button>
+            </div>
           </div>
 
-          {upcomingTasks.length === 0 ? (
-            <p className="text-muted-foreground text-sm py-4 text-center">
+          {(taskView === "upcoming" ? upcomingTasks : activePlot.tasks).length === 0 ? (
+            <p className="text-muted-foreground text-sm py-8 text-center bg-slate-50/50 rounded-xl border border-slate-100 border-dashed">
               ไม่มีงานที่ต้องทำ หรือทำครบแล้ว
             </p>
           ) : (
-            <ul className="space-y-2">
-              {upcomingTasks.map((task) => (
-                <motion.li
-                  key={task.id}
-                  layout
-                  className={`flex items-start gap-4 p-4 rounded-xl border transition-all ${
-                    task.isCompleted
-                      ? "bg-emerald-50/60 border-emerald-100/80"
-                      : "bg-slate-50/50 border-slate-100 hover:bg-slate-50 hover:border-slate-200"
-                  }`}
-                >
-                  <TaskGlyph
-                    taskName={task.taskName}
-                    className="w-5 h-5 text-emerald-700 shrink-0 mt-1"
-                    aria-hidden
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleTask(activePlot.id, task.id)}
-                    className="shrink-0 mt-0.5 text-emerald-600 hover:text-emerald-700"
+            <div className={`space-y-2 ${taskView === "all" ? "max-h-[500px] overflow-y-auto pr-2 [scrollbar-gutter:stable]" : ""}`}>
+              {(taskView === "upcoming" ? upcomingTasks : activePlot.tasks).map((task) => {
+                const isOverdue = !task.isCompleted && new Date(task.date) < today;
+                
+                return (
+                  <motion.div
+                    key={task.id}
+                    layout
+                    className={`flex items-start gap-4 p-4 rounded-xl border transition-all ${
+                      task.isCompleted
+                        ? "bg-emerald-50/40 border-emerald-100/60 opacity-80"
+                        : isOverdue 
+                        ? "bg-rose-50/50 border-rose-200"
+                        : "bg-white border-slate-200 shadow-sm hover:border-emerald-300"
+                    }`}
                   >
-                    {task.isCompleted ? (
-                      <CheckCircle2 className="w-6 h-6" />
-                    ) : (
-                      <Circle className="w-6 h-6" />
-                    )}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <p className={`font-medium ${task.isCompleted ? "line-through text-muted-foreground" : "text-emerald-900"}`}>
-                      {task.taskName}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(task.date), "EEE d MMM yyyy", { locale: th })} • {task.stage}
-                    </p>
-                    {task.description && (
-                      <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
-                    )}
-                  </div>
-                </motion.li>
-              ))}
-            </ul>
+                    <TaskGlyph
+                      taskName={task.taskName}
+                      className={`w-5 h-5 shrink-0 mt-1 ${isOverdue ? "text-rose-600" : "text-emerald-700"}`}
+                      aria-hidden
+                    />
+                    <button
+                      type="button"
+                      onClick={() => toggleTask(activePlot.id, task.id)}
+                      className={`shrink-0 mt-0.5 ${
+                        task.isCompleted 
+                          ? "text-emerald-500 hover:text-emerald-600" 
+                          : isOverdue
+                          ? "text-rose-400 hover:text-rose-600"
+                          : "text-slate-300 hover:text-emerald-500"
+                      }`}
+                    >
+                      {task.isCompleted ? (
+                        <CheckCircle2 className="w-6 h-6" />
+                      ) : (
+                        <Circle className="w-6 h-6" />
+                      )}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className={`font-medium ${
+                          task.isCompleted ? "line-through text-slate-500" : "text-slate-900"
+                        }`}>
+                          {task.taskName}
+                        </p>
+                        {isOverdue && <Badge variant="outline" className="text-[10px] text-rose-600 border-rose-200 bg-white">เลยกำหนด</Badge>}
+                      </div>
+                      <p className={`text-sm mt-0.5 ${isOverdue ? "text-rose-600" : "text-slate-500"}`}>
+                        {format(new Date(task.date), "EEE d MMM yyyy", { locale: th })} • {task.stage}
+                      </p>
+                      {task.description && (
+                        <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{task.description}</p>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
           )}
         </Card>
 

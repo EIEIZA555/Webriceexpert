@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FileText,
   Upload,
@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Plus,
   Sprout,
+  Users,
 } from "lucide-react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -32,7 +33,13 @@ import {
 import { apiFetch, API_BASE_URL, getAuthToken } from "../lib/api";
 import VarietiesAdminPanel from "./VarietiesAdminPanel";
 
-type Tab = "docs" | "faq" | "prompts" | "varieties";
+type Tab = "users" | "docs" | "faq" | "prompts" | "varieties";
+
+interface UserResponse {
+  id: string;
+  username: string;
+  role: string;
+}
 
 interface DocumentResponse {
   id: string;
@@ -58,14 +65,6 @@ interface PromptTemplate {
   content: string;
   created_at: string;
 }
-
-const UPLOAD_COLLECTIONS: { value: string; label: string }[] = [
-  { value: "jasmine", label: "ข้าวหอมมะลิ" },
-  { value: "rd43", label: "ข้าว RD43" },
-  { value: "kk15", label: "ข้าวกข 15" },
-  { value: "pathumthani", label: "ข้าวปทุมธานี" },
-  { value: "general", label: "ทั่วไป" },
-];
 
 function FaqTab({ faq, faqLoading }: { faq: FaqItem[]; faqLoading: boolean }) {
   return (
@@ -97,7 +96,12 @@ function FaqTab({ faq, faqLoading }: { faq: FaqItem[]; faqLoading: boolean }) {
 }
 
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState<Tab>("docs");
+  const [activeTab, setActiveTab] = useState<Tab>("users");
+
+  // --- Users state ---
+  const [usersList, setUsersList] = useState<UserResponse[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersLoaded, setUsersLoaded] = useState(false);
 
   // --- Docs state ---
   const [documents, setDocuments] = useState<DocumentResponse[]>([]);
@@ -124,6 +128,12 @@ export default function Admin() {
   const [promptsError, setPromptsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const refreshDocumentCollections = useCallback(() => {
+    apiFetch<CollectionItem[]>("/documents/collections", {}, false)
+      .then(setCollections)
+      .catch(() => {});
+  }, []);
+
   // fetch docs + collections on mount
   useEffect(() => {
     Promise.all([
@@ -138,13 +148,50 @@ export default function Admin() {
       .finally(() => setDocsLoading(false));
   }, []);
 
+  // รายการ collection มาจากพันธุ์ใน DB — รีเฟรชทุกครั้งที่เปิดแท็บเอกสาร (หลังเพิ่มพันธุ์ในแท็บอื่น)
+  useEffect(() => {
+    if (activeTab === "docs") refreshDocumentCollections();
+  }, [activeTab, refreshDocumentCollections]);
+
+  // fetch Users on tab switch
+  useEffect(() => {
+    if (activeTab === "users" && !usersLoaded) {
+      setUsersLoading(true);
+      apiFetch<UserResponse[]>("/admin/users", {}, true)
+        .then(setUsersList)
+        .catch(() => { })
+        .finally(() => {
+          setUsersLoading(false);
+          setUsersLoaded(true);
+        });
+    }
+  }, [activeTab, usersLoaded]);
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    try {
+      const updatedUser = await apiFetch<UserResponse>(
+        `/admin/users/${userId}/role`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ role: newRole }),
+        },
+        true
+      );
+      setUsersList((prev) =>
+        prev.map((u) => (u.id === userId ? updatedUser : u))
+      );
+    } catch (e) {
+      alert((e as Error).message);
+    }
+  };
+
   // fetch FAQ on tab switch
   useEffect(() => {
     if (activeTab === "faq" && !faqLoaded) {
       setFaqLoading(true);
       apiFetch<FaqItem[]>("/admin/faq", {}, true)
         .then(setFaq)
-        .catch(() => {})
+        .catch(() => { })
         .finally(() => {
           setFaqLoading(false);
           setFaqLoaded(true);
@@ -158,7 +205,7 @@ export default function Admin() {
       setPromptsLoading(true);
       apiFetch<PromptTemplate[]>("/prompts/", {}, false)
         .then(setPrompts)
-        .catch(() => {})
+        .catch(() => { })
         .finally(() => {
           setPromptsLoading(false);
           setPromptsLoaded(true);
@@ -249,6 +296,7 @@ export default function Admin() {
   const [varietyCount, setVarietyCount] = useState(0);
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
+    { key: "users", label: "จัดการผู้ใช้งาน", icon: <Users className="w-4 h-4" /> },
     { key: "docs", label: "เอกสาร", icon: <FileText className="w-4 h-4" /> },
     { key: "faq", label: "FAQ", icon: <HelpCircle className="w-4 h-4" /> },
     { key: "prompts", label: "Prompt Templates", icon: <MessageSquare className="w-4 h-4" /> },
@@ -270,17 +318,69 @@ export default function Admin() {
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
-              activeTab === key
-                ? "bg-primary text-white"
-                : "bg-white border border-border text-foreground hover:bg-accent"
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${activeTab === key
+              ? "bg-primary text-white"
+              : "bg-white border border-border text-foreground hover:bg-accent"
+              }`}
           >
             {icon}
             {label}
           </button>
         ))}
       </div>
+
+      {/* Users Tab */}
+      {activeTab === "users" && (
+        <div className="space-y-4">
+          <h3 className="font-medium">จัดการผู้ใช้งานระบบ ({usersList.length})</h3>
+
+          {usersLoading ? (
+            <p className="text-sm text-muted-foreground">กำลังโหลดข้อมูลผู้ใช้งาน...</p>
+          ) : usersList.length === 0 ? (
+            <Card className="p-8 rounded-xl text-center text-muted-foreground text-sm">
+              ไม่มีข้อมูลผู้ใช้งาน
+            </Card>
+          ) : (
+            <Card className="rounded-xl overflow-hidden shadow-sm border-slate-200">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
+                    <tr>
+                      <th className="px-6 py-4 font-medium">ผู้ใช้งาน (Username)</th>
+                      <th className="px-6 py-4 font-medium">ระดับสิทธิ์ (Role)</th>
+                      <th className="px-6 py-4 font-medium min-w-[200px]">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {usersList.map((user) => (
+                      <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4 font-medium text-slate-900">
+                          {user.username}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-slate-700 font-medium">
+                            {user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase()}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <select
+                            value={user.role}
+                            onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                            className="bg-white border border-slate-300 text-slate-900 text-xs rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full max-w-[150px] p-2"
+                          >
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Documents Tab */}
       {activeTab === "docs" && (
@@ -322,7 +422,7 @@ export default function Admin() {
                 >
                   {collections.map((c) => (
                     <option key={c.value} value={c.value}>
-                      {c.value}
+                      {c.label === c.value ? c.label : `${c.label} · ${c.value}`}
                     </option>
                   ))}
                 </select>
@@ -364,8 +464,8 @@ export default function Admin() {
                   const group =
                     value === "__other__"
                       ? documents.filter(
-                          (d) => !knownValues.includes(d.chroma_collection),
-                        )
+                        (d) => !knownValues.includes(d.chroma_collection),
+                      )
                       : documents.filter((d) => d.chroma_collection === value);
                   if (group.length === 0) return null;
                   return (
@@ -558,7 +658,12 @@ export default function Admin() {
         </div>
       )}
 
-      {activeTab === "varieties" && <VarietiesAdminPanel onCountChange={setVarietyCount} />}
+      {activeTab === "varieties" && (
+        <VarietiesAdminPanel
+          onCountChange={setVarietyCount}
+          onVarietiesMutated={refreshDocumentCollections}
+        />
+      )}
     </div>
   );
 }
