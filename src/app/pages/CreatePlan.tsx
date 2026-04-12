@@ -13,7 +13,7 @@ export default function CreatePlan() {
   const navigate = useNavigate();
   const { createPlan } = usePlans();
   const [step, setStep] = useState(1);
-  const [varieties, setVarieties] = useState<{ id: string; name: string; supported_methods: string[] }[]>([]);
+  const [varieties, setVarieties] = useState<{ id: string; name: string; supported_methods: string[]; is_photoperiod_sensitive?: boolean; heading_calendar?: string | null }[]>([]);
 
   const [formData, setFormData] = useState({
     variety: "",
@@ -28,9 +28,15 @@ export default function CreatePlan() {
   const [varietyQuery, setVarietyQuery] = useState("");
 
   useEffect(() => {
-    apiFetch<Array<{ collection_name: string; name: string; supported_methods: string[] }>>("/varieties/")
+    apiFetch<Array<{ collection_name: string; name: string; supported_methods: string[]; is_photoperiod_sensitive: boolean; heading_calendar: string | null }>>("/varieties/")
       .then((rows) => {
-        setVarieties(rows.map((r) => ({ id: r.collection_name, name: r.name, supported_methods: r.supported_methods })));
+        setVarieties(rows.map((r) => ({ 
+          id: r.collection_name, 
+          name: r.name, 
+          supported_methods: r.supported_methods,
+          is_photoperiod_sensitive: r.is_photoperiod_sensitive,
+          heading_calendar: r.heading_calendar
+        })));
       })
       .catch(() => {});
   }, []);
@@ -242,6 +248,20 @@ export default function CreatePlan() {
                 <p className="text-sm text-muted-foreground mt-2">
                   ระบบจะคำนวณวันลงปลูกจริงและการดูแลต่างๆ ให้สัมพันธ์กับวันที่คุณเริ่มเตรียมงาน
                 </p>
+
+                {selectedVariety?.is_photoperiod_sensitive && (
+                  <div className="mt-6 p-4 bg-[#fff8e1] border border-[#ffe082] rounded-xl flex items-start gap-3">
+                    <div className="text-[#ff8f00] mt-0.5">🌾</div>
+                    <div>
+                      <h4 className="text-sm font-medium text-[#ff8f00]">พันธุ์ข้าวไวแสง (Photosensitive)</h4>
+                      <p className="text-xs text-[#ffb300] mt-1 leading-relaxed">
+                        ข้าวพันธุ์นี้จะออกดอกรอบเก็บเกี่ยวตามฤดูกาลตายตัว {selectedVariety.heading_calendar ? `(กำหนดออกดอกประมาณวันที่ ${selectedVariety.heading_calendar.split('-')[1]}/${selectedVariety.heading_calendar.split('-')[0]})` : ""} 
+                        <br />
+                        <span className="font-semibold text-[#ff8f00]">คำแนะนำ:</span> ควรเริ่มเตรียมงานปลูกในช่วง <span className="underline">พฤษภาคม - สิงหาคม</span>
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
