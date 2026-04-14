@@ -160,7 +160,9 @@ export default function VarietiesAdminPanel({
       const hc = form.heading_calendar ?? "";
       const parts = hc.split("-");
       if (parts.length < 2 || !parts[0] || !parts[1])
-        errors.heading_calendar = "กรุณาเลือกวันออกรวงตามปฏิทิน";
+        errors.heading_calendar = "กรุณาเลือกวันตั้งท้องและออกรวงตามปฏิทิน";
+    } else if (form.is_photoperiod_sensitive === false) {
+      if (form.heading_day == null) errors.heading_day = "กรุณากรอกวันตั้งท้องและออกรวง";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -290,7 +292,7 @@ export default function VarietiesAdminPanel({
             {(v.tillering_day || v.panicle_initiation_day || v.heading_day) && (
               <p className="text-xs text-muted-foreground mb-2">
                 แตกกอ: {v.tillering_day ?? "-"} วัน • กำเนิดช่อดอก:{" "}
-                {v.panicle_initiation_day ?? "-"} วัน • ออกรวง:{" "}
+                {v.panicle_initiation_day ?? "-"} วัน • ตั้งท้องและออกรวง:{" "}
                 {v.heading_day ?? "-"} วัน
               </p>
             )}
@@ -474,7 +476,7 @@ export default function VarietiesAdminPanel({
                 <div>
                   {form.is_photoperiod_sensitive ? (
                     <>
-                      <Label className="text-xs">วันออกรวงตามปฏิทิน</Label>
+                      <Label className="text-xs">วันตั้งท้องและออกรวงตามปฏิทิน</Label>
                       <div
                         data-field="heading_calendar"
                         className="flex gap-2 mt-1"
@@ -555,15 +557,17 @@ export default function VarietiesAdminPanel({
                     </>
                   ) : (
                     <>
-                      <Label className="text-xs">วันออกรวง</Label>
+                      <Label className="text-xs">วันตั้งท้องและออกรวง</Label>
                       <Input
+                        data-field="heading_day"
                         type="number"
                         min={0}
-                        className="mt-1 rounded-lg"
+                        className={`mt-1 rounded-lg ${errClass("heading_day")}`}
                         placeholder="เช่น 75"
                         value={num(form.heading_day)}
                         onChange={(e) => setNum("heading_day", e.target.value)}
                       />
+                      <FieldError field="heading_day" />
                     </>
                   )}
                 </div>

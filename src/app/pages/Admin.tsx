@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FileText,
   Upload,
-  Trash2,
   ExternalLink,
   HelpCircle,
   MessageSquare,
@@ -13,25 +12,16 @@ import {
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "../components/ui/alert-dialog";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from "../components/ui/dialog";
-import { apiFetch, API_BASE_URL, getAuthToken } from "../lib/api";
+import { apiFetch, API_BASE_URL, getAuthToken, fetchDocsAndCollections, type DocumentResponse, type CollectionItem } from "../lib/api";
 import VarietiesAdminPanel from "./VarietiesAdminPanel";
+import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog";
+import { EmptyState } from "../components/EmptyState";
 
 type Tab = "users" | "docs" | "faq" | "prompts" | "varieties";
 
@@ -39,19 +29,6 @@ interface UserResponse {
   id: string;
   username: string;
   role: string;
-}
-
-interface DocumentResponse {
-  id: string;
-  filename: string;
-  file_type: string;
-  chroma_collection: string;
-  created_at: string;
-}
-
-interface CollectionItem {
-  value: string;
-  label: string;
 }
 
 interface FaqItem {
@@ -73,9 +50,7 @@ function FaqTab({ faq, faqLoading }: { faq: FaqItem[]; faqLoading: boolean }) {
       {faqLoading ? (
         <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
       ) : faq.length === 0 ? (
-        <Card className="p-8 rounded-xl text-center text-muted-foreground text-sm">
-          ยังไม่มีประวัติการสนทนา
-        </Card>
+        <EmptyState message="ยังไม่มีประวัติการสนทนา" />
       ) : (
         <div className="divide-y divide-border border border-border rounded-xl overflow-hidden bg-white">
           {faq.map((item, i) => (
@@ -136,13 +111,10 @@ export default function Admin() {
 
   // fetch docs + collections on mount
   useEffect(() => {
-    Promise.all([
-      apiFetch<DocumentResponse[]>("/documents/", {}, false),
-      apiFetch<CollectionItem[]>("/documents/collections", {}, false),
-    ])
-      .then(([docs, cols]) => {
-        setDocuments(docs);
-        setCollections(cols);
+    fetchDocsAndCollections()
+      .then(({ documents, collections }) => {
+        setDocuments(documents);
+        setCollections(collections);
       })
       .catch((e) => setDocsError((e as Error).message))
       .finally(() => setDocsLoading(false));
@@ -235,10 +207,7 @@ export default function Admin() {
           (data as { detail?: string }).detail ?? "อัพโหลดไม่สำเร็จ",
         );
       }
-      const [docs, cols] = await Promise.all([
-        apiFetch<DocumentResponse[]>("/documents/", {}, false),
-        apiFetch<CollectionItem[]>("/documents/collections", {}, false),
-      ]);
+      const { documents: docs, collections: cols } = await fetchDocsAndCollections();
       setDocuments(docs);
       setCollections(cols);
     } catch (e) {
@@ -293,8 +262,6 @@ export default function Admin() {
     }
   };
 
-  const [varietyCount, setVarietyCount] = useState(0);
-
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "users", label: "จัดการผู้ใช้งาน", icon: <Users className="w-4 h-4" /> },
     { key: "docs", label: "เอกสาร", icon: <FileText className="w-4 h-4" /> },
@@ -337,9 +304,7 @@ export default function Admin() {
           {usersLoading ? (
             <p className="text-sm text-muted-foreground">กำลังโหลดข้อมูลผู้ใช้งาน...</p>
           ) : usersList.length === 0 ? (
-            <Card className="p-8 rounded-xl text-center text-muted-foreground text-sm">
-              ไม่มีข้อมูลผู้ใช้งาน
-            </Card>
+            <EmptyState message="ไม่มีข้อมูลผู้ใช้งาน" />
           ) : (
             <Card className="rounded-xl overflow-hidden shadow-sm border-slate-200">
               <div className="overflow-x-auto">
@@ -409,7 +374,7 @@ export default function Admin() {
           </div>
 
           <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-            <DialogContent>
+            <DialogContent className="max-w-sm">
               <DialogHeader>
                 <DialogTitle>อัพโหลดเอกสาร</DialogTitle>
               </DialogHeader>
@@ -453,9 +418,7 @@ export default function Admin() {
           {docsLoading ? (
             <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
           ) : documents.length === 0 ? (
-            <Card className="p-8 rounded-xl text-center text-muted-foreground text-sm">
-              ยังไม่มีเอกสารในระบบ
-            </Card>
+            <EmptyState message="ยังไม่มีเอกสารในระบบ" />
           ) : (
             <div className="space-y-6">
               {[...collections, { value: "__other__", label: "อื่นๆ" }].map(
@@ -506,39 +469,11 @@ export default function Admin() {
                                 <ExternalLink className="w-4 h-4 mr-1" />
                                 เปิดอ่าน
                               </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="rounded-lg text-destructive hover:text-destructive"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      ลบเอกสาร
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      ต้องการลบ "{doc.filename}" ใช่ไหม?
-                                      การลบจะไม่สามารถกู้คืนได้
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>
-                                      ยกเลิก
-                                    </AlertDialogCancel>
-                                    <AlertDialogAction
-                                      className="bg-destructive hover:bg-destructive/90"
-                                      onClick={() => handleDeleteDoc(doc.id)}
-                                    >
-                                      ลบ
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              <DeleteConfirmDialog
+                                title="ลบเอกสาร"
+                                description={`ต้องการลบ "${doc.filename}" ใช่ไหม? การลบจะไม่สามารถกู้คืนได้`}
+                                onConfirm={() => handleDeleteDoc(doc.id)}
+                              />
                             </div>
                           </Card>
                         ))}
@@ -598,9 +533,7 @@ export default function Admin() {
           {promptsLoading ? (
             <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
           ) : prompts.length === 0 ? (
-            <Card className="p-8 rounded-xl text-center text-muted-foreground text-sm">
-              ยังไม่มี template
-            </Card>
+            <EmptyState message="ยังไม่มี template" />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {prompts.map((p) => (
@@ -618,35 +551,12 @@ export default function Admin() {
                         {p.created_at.slice(0, 10)}
                       </p>
                     </div>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="rounded-lg text-destructive hover:text-destructive shrink-0"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>ลบ Template</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            ต้องการลบ "{p.title}" ใช่ไหม?
-                            การลบจะไม่สามารถกู้คืนได้
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-destructive hover:bg-destructive/90"
-                            onClick={() => handleDeletePrompt(p.id)}
-                          >
-                            ลบ
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <DeleteConfirmDialog
+                      title="ลบ Template"
+                      description={`ต้องการลบ "${p.title}" ใช่ไหม? การลบจะไม่สามารถกู้คืนได้`}
+                      onConfirm={() => handleDeletePrompt(p.id)}
+                      triggerClassName="shrink-0"
+                    />
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2 whitespace-pre-wrap">
                     {p.content}
@@ -660,7 +570,6 @@ export default function Admin() {
 
       {activeTab === "varieties" && (
         <VarietiesAdminPanel
-          onCountChange={setVarietyCount}
           onVarietiesMutated={refreshDocumentCollections}
         />
       )}

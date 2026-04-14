@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Sprout, SendHorizonal } from "lucide-react";
+import { MessageCircle, X, Sprout, SendHorizonal, FlaskConical } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { isAuthenticated } from "../lib/auth";
 import { usePlans } from "../contexts/PlansContext";
@@ -63,10 +63,23 @@ export function FloatingChat() {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [hasSentMessage, setHasSentMessage] = useState(false);
+  const [noRagMode, setNoRagMode] = useState(false);
+  const headerClickCount = useRef(0);
+  const headerClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleHeaderTripleClick = () => {
+    headerClickCount.current += 1;
+    if (headerClickTimer.current) clearTimeout(headerClickTimer.current);
+    headerClickTimer.current = setTimeout(() => { headerClickCount.current = 0; }, 600);
+    if (headerClickCount.current >= 3) {
+      headerClickCount.current = 0;
+      setNoRagMode((prev) => !prev);
+    }
   };
 
   useEffect(() => {
@@ -104,8 +117,8 @@ export function FloatingChat() {
   const handleSend = async () => {
     if (!inputMessage.trim() || isLoading) return;
 
-    const question = (() => {
-      if (!plan) return inputMessage;
+    const planContext = (() => {
+      if (!plan) return undefined;
 
       const das = getDaysSinceStart();
       const stage = getCurrentStageName() ?? "ไม่ระบุระยะ";
@@ -123,8 +136,7 @@ export function FloatingChat() {
         ? upcomingTasks.map(t => `- ${t.taskName} (${t.date}): ${t.description}`).join("\n")
         : "ไม่มีงานใน 7 วันข้างหน้า";
 
-      const contextPrefix =
-        `[บริบทแปลงนาของผู้ใช้]\n` +
+      return `[บริบทแปลงนาของผู้ใช้]\n` +
         `พันธุ์: ${plan.varietyName}\n` +
         `วิธีปลูก: ${getPlantingMethodLabel(plan.plantingMethod)}\n` +
         `พื้นที่: ${plan.areaRai} ไร่\n` +
@@ -133,18 +145,16 @@ export function FloatingChat() {
         `ผ่านมาแล้ว: ${das} วัน\n` +
         `ระยะปัจจุบัน: ${stage}\n` +
         `งานวันนี้:\n${todayText}\n` +
-        `งานใน 7 วันข้างหน้า:\n${upcomingText}\n\n` +
-        `คำถาม: `;
-
-      return contextPrefix + inputMessage;
+        `งานใน 7 วันข้างหน้า:\n${upcomingText}`;
     })();
+
+    const question = inputMessage.trim();
 
     const userMessage: ChatMessage = {
       id: messages.length + 1,
-      text: inputMessage.trim(),
+      text: question,
       sender: "user",
       timestamp: new Date(),
-      ...(plan ? { apiPayload: question } : {}),
     };
     setMessages((prev) => [...prev, userMessage]);
     setInputMessage("");
@@ -159,9 +169,15 @@ export function FloatingChat() {
           role: m.sender === "user" ? "user" : "assistant",
           content: m.sender === "user" ? (m.apiPayload ?? m.text) : m.text,
         }));
-      const data = await apiFetch<ChatResponse>("/chat/", {
+      const endpoint = noRagMode ? "/chat/no-rag" : "/chat/";
+      const data = await apiFetch<ChatResponse>(endpoint, {
         method: "POST",
-        body: JSON.stringify({ question, history, collection: plan?.varietyId ?? null }),
+        body: JSON.stringify({
+          question,
+          plan_context: planContext,
+          history,
+          collection: plan?.varietyId ?? null
+        }),
       }, true);
 
       setMessages((prev) => [...prev, {
@@ -206,13 +222,25 @@ export function FloatingChat() {
         <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[480px] sm:h-[640px] w-full h-full sm:max-h-[88vh] bg-white sm:rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden border-0 sm:border border-primary/20">
           {/* Header */}
           <div className="bg-primary text-white px-4 py-3.5 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-3 min-w-0">
+            <div
+              className="flex items-center gap-3 min-w-0 cursor-default select-none"
+              onClick={handleHeaderTripleClick}
+            >
               <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                <Sprout size={22} strokeWidth={2} />
+                {noRagMode ? <FlaskConical size={22} strokeWidth={2} /> : <Sprout size={22} strokeWidth={2} />}
               </div>
               <div className="min-w-0">
-                <h3 className="font-bold text-base truncate">AI ผู้ช่วยวิชาการข้าว</h3>
-                <p className="text-xs text-white/80 truncate">พร้อมให้คำปรึกษาจากคู่มือกรมการข้าว</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-base truncate">AI ผู้ช่วยวิชาการข้าว</h3>
+                  {noRagMode && (
+                    <span className="text-[10px] font-semibold bg-amber-400/30 text-amber-100 border border-amber-300/40 px-1.5 py-0.5 rounded-full shrink-0">
+                      No-RAG
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-white/80 truncate">
+                  {noRagMode ? "โหมดทดสอบ — ไม่ใช้เอกสารอ้างอิง" : "พร้อมให้คำปรึกษาจากคู่มือกรมการข้าว"}
+                </p>
               </div>
             </div>
             <button

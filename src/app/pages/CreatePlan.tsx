@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
+import { format } from "date-fns";
+import { formatBE } from "../lib/dateUtils";
+import { th } from "date-fns/locale";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { ArrowLeft, Check, Leaf, Search } from "lucide-react";
+import { Calendar } from "../components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import { ArrowLeft, CalendarIcon, Check, Leaf, Search } from "lucide-react";
 import { usePlans } from "../contexts/PlansContext";
 import { PLANTING_METHODS, type PlantingMethodKey } from "../lib/plantingMethod";
 import { apiFetch } from "../lib/api";
@@ -23,6 +28,7 @@ export default function CreatePlan() {
     plantingMethod: "" as PlantingMethodKey | "",
     soilType: "clay" as "clay" | "loam" | "sandy",
   });
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [varietyQuery, setVarietyQuery] = useState("");
@@ -217,6 +223,11 @@ export default function CreatePlan() {
                             </div>
                           )}
                         </div>
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                          <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full font-medium ${variety.is_photoperiod_sensitive ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
+                            {variety.is_photoperiod_sensitive ? "นาปี" : "นาปรัง"}
+                          </span>
+                        </div>
                         <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed line-clamp-3">
                           {variety.supported_methods.map((m) => PLANTING_METHODS.find((p) => p.key === m)?.label ?? m).join(", ")}
                         </p>
@@ -238,13 +249,40 @@ export default function CreatePlan() {
                 <Label htmlFor="plantDate" className="mb-2 block">
                   วันที่เริ่มเตรียมงาน
                 </Label>
-                <Input
-                  id="plantDate"
-                  type="date"
-                  value={formData.plantDate}
-                  onChange={(e) => setFormData({ ...formData, plantDate: e.target.value })}
-                  className="rounded-lg bg-input-background border-border h-12"
-                />
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger className="flex w-full h-12 rounded-lg items-center px-3 text-left text-sm bg-input-background border border-border gap-2 hover:bg-accent transition-colors">
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                    {formData.plantDate ? (
+                      <span>{formatBE(new Date(`${formData.plantDate}T00:00:00`), "d MMMM yyyy", { locale: th })}</span>
+                    ) : (
+                      <span className="text-muted-foreground">เลือกวันที่</span>
+                    )}
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.plantDate ? new Date(`${formData.plantDate}T00:00:00`) : undefined}
+                      disabled={{ before: new Date() }}
+                      onSelect={(date) => {
+                        if (date) {
+                          const yyyy = date.getFullYear();
+                          const mm = String(date.getMonth() + 1).padStart(2, "0");
+                          const dd = String(date.getDate()).padStart(2, "0");
+                          setFormData({ ...formData, plantDate: `${yyyy}-${mm}-${dd}` });
+                        }
+                        setCalendarOpen(false);
+                      }}
+                      formatters={{
+                        formatCaption: (date) => {
+                          const months = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+                          return `${months[date.getMonth()]} ${date.getFullYear() + 543}`;
+                        },
+                      }}
+                      locale={th}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
                 <p className="text-sm text-muted-foreground mt-2">
                   ระบบจะคำนวณวันลงปลูกจริงและการดูแลต่างๆ ให้สัมพันธ์กับวันที่คุณเริ่มเตรียมงาน
                 </p>
@@ -255,7 +293,7 @@ export default function CreatePlan() {
                     <div>
                       <h4 className="text-sm font-medium text-[#ff8f00]">พันธุ์ข้าวไวแสง (Photosensitive)</h4>
                       <p className="text-xs text-[#ffb300] mt-1 leading-relaxed">
-                        ข้าวพันธุ์นี้จะออกดอกรอบเก็บเกี่ยวตามฤดูกาลตายตัว {selectedVariety.heading_calendar ? `(กำหนดออกดอกประมาณวันที่ ${selectedVariety.heading_calendar.split('-')[1]}/${selectedVariety.heading_calendar.split('-')[0]})` : ""} 
+                        ข้าวพันธุ์นี้จะออกดอกรอบเก็บเกี่ยวตามฤดูกาลตายตัว {selectedVariety.heading_calendar ? `(กำหนดออกดอกประมาณวันที่ ${selectedVariety.heading_calendar.split('-')[0]}/${selectedVariety.heading_calendar.split('-')[1]})` : ""}
                         <br />
                         <span className="font-semibold text-[#ff8f00]">คำแนะนำ:</span> ควรเริ่มเตรียมงานปลูกในช่วง <span className="underline">พฤษภาคม - สิงหาคม</span>
                       </p>
@@ -363,7 +401,7 @@ export default function CreatePlan() {
                   <h4 className="text-sm mb-2">สรุปแผนของคุณ</h4>
                   <div className="text-sm space-y-1 text-muted-foreground">
                     <p>• พันธุ์ข้าว: {selectedVariety?.name ?? "-"}</p>
-                    <p>• วันที่ปลูก: {formData.plantDate}</p>
+                    <p>• วันที่ปลูก: {formData.plantDate ? formatBE(new Date(`${formData.plantDate}T00:00:00`), "d MMMM yyyy", { locale: th }) : "-"}</p>
                     <p>• ชื่อแปลง: {formData.plotName || "-"}</p>
                     <p>• ขนาดพื้นที่: {formData.landSize || "-"} ไร่</p>
                     <p>• ประเภทดิน: {{ clay: "ดินเหนียว", loam: "ดินร่วน", sandy: "ดินทราย" }[formData.soilType]}</p>

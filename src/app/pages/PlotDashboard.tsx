@@ -14,10 +14,12 @@ import {
 import { usePlans, type PlanTask } from "../contexts/PlansContext";
 import { motion } from "motion/react";
 import { format } from "date-fns";
+import { formatBE } from "../lib/dateUtils";
 import { th } from "date-fns/locale";
 import { addDaysToISODate } from "../lib/planGenerator";
 import { getPlantingMethodLabel } from "../lib/plantingMethod";
 import { TaskGlyph } from "../lib/taskIcons";
+import LoadingScreen from "../components/LoadingScreen";
 
 export default function PlotDashboard() {
   const { id } = useParams();
@@ -41,13 +43,7 @@ export default function PlotDashboard() {
     setCurrentPlanId(id);
   }, [id, setCurrentPlanId]);
 
-  if (loading) {
-    return (
-      <div className="p-6 lg:p-10 flex items-center justify-center">
-        <p className="text-muted-foreground text-sm">กำลังโหลด...</p>
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen />;
 
   const activePlot = plan;
   if (!activePlot) {
@@ -74,8 +70,7 @@ export default function PlotDashboard() {
   const future30 = new Date(today);
   future30.setDate(future30.getDate() + 30);
   const hasTasksIn30Days = activePlot.tasks.some((t) => {
-    const d = new Date(t.date);
-    d.setHours(0, 0, 0, 0);
+    const d = new Date(`${t.date}T00:00:00`);
     return d >= today && d <= future30;
   });
   const upcomingLabel = hasTasksIn30Days ? "งานที่ต้องทำ" : "งานถัดไปที่ต้องทำ";
@@ -150,7 +145,7 @@ export default function PlotDashboard() {
             <p className="text-xl font-semibold text-foreground mb-2">{currentStage ?? "-"}</p>
             <p className="text-sm text-muted-foreground leading-relaxed">
               ผ่านมาแล้ว {daysSinceStart} วัน • เริ่มปลูก{" "}
-              {format(new Date(activePlot.startDate), "d MMM yyyy", { locale: th })}
+              {formatBE(new Date(activePlot.startDate), "d MMM yyyy", { locale: th })}
             </p>
             <p className="text-sm text-muted-foreground mt-0.5">
               {activePlot.areaRai} ไร่
@@ -274,7 +269,7 @@ export default function PlotDashboard() {
           ) : (
             <div className={`space-y-2 ${taskView === "all" ? "max-h-[500px] overflow-y-auto pr-2 [scrollbar-gutter:stable]" : ""}`}>
               {(taskView === "upcoming" ? upcomingTasks : activePlot.tasks).map((task) => {
-                const isOverdue = !task.isCompleted && new Date(task.date) < today;
+                const isOverdue = !task.isCompleted && new Date(`${task.date}T00:00:00`) < today;
                 
                 return (
                   <motion.div
@@ -320,7 +315,7 @@ export default function PlotDashboard() {
                         {isOverdue && <Badge variant="outline" className="text-[10px] text-rose-600 border-rose-200 bg-white">เลยกำหนด</Badge>}
                       </div>
                       <p className={`text-sm mt-0.5 ${isOverdue ? "text-rose-600" : "text-slate-500"}`}>
-                        {format(new Date(task.date), "EEE d MMM yyyy", { locale: th })} • {task.stage}
+                        {formatBE(new Date(task.date), "EEE d MMM yyyy", { locale: th })} • {task.stage}
                       </p>
                       {task.description && (
                         <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{task.description}</p>
@@ -363,8 +358,8 @@ export default function PlotDashboard() {
                   }`}
                 >
                   <p className="text-xs text-muted-foreground">
-                    {format(new Date(`${sStartISO}T00:00:00`), "d MMM yyyy", { locale: th })}
-                    {sStartISO !== sEndISO && ` – ${format(new Date(`${sEndISO}T00:00:00`), "d MMM yyyy", { locale: th })}`}
+                    {formatBE(new Date(`${sStartISO}T00:00:00`), "d MMM yyyy", { locale: th })}
+                    {sStartISO !== sEndISO && ` – ${formatBE(new Date(`${sEndISO}T00:00:00`), "d MMM yyyy", { locale: th })}`}
                   </p>
                   <p className="font-semibold mt-1 text-sm text-foreground">{s.name}</p>
                   {sTasks.map((t) => (

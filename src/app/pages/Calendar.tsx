@@ -5,8 +5,10 @@ import { DayPicker, type DayContentProps } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
+import { formatBE } from "../lib/dateUtils";
 import { addDaysToISODate } from "../lib/planGenerator";
 import { TaskGlyph } from "../lib/taskIcons";
+import LoadingScreen from "../components/LoadingScreen";
 import {
   Select,
   SelectContent,
@@ -24,13 +26,7 @@ export default function Calendar() {
   const [selectedDay, setSelectedDay] = useState<Date | undefined>(new Date());
   const [view, setView] = useState<CalendarView>("milestone");
 
-  if (loading) {
-    return (
-      <div className="p-6 lg:p-10 flex items-center justify-center">
-        <p className="text-muted-foreground text-sm">กำลังโหลด...</p>
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen />;
 
   if (!plan || plans.length === 0) {
     return (
@@ -154,7 +150,7 @@ export default function Calendar() {
           <h3 className="text-sm font-semibold text-foreground mb-1">งานในวันที่เลือก</h3>
           <p className="text-xs text-muted-foreground mb-4">
             {selectedDay
-              ? format(selectedDay, "EEE d MMM yyyy", { locale: th })
+              ? formatBE(selectedDay, "EEE d MMM yyyy", { locale: th })
               : "ยังไม่ได้เลือกวันที่"}
           </p>
           {tasksForSelected.length === 0 ? (
@@ -190,8 +186,8 @@ export default function Calendar() {
                   className={`p-3 rounded-xl border ${isCurrent ? "bg-emerald-50 border-emerald-200" : "bg-slate-50/40 border-slate-200"}`}
                 >
                   <p className="text-xs text-muted-foreground">
-                    {format(new Date(`${sStartISO}T00:00:00`), "d MMM yyyy", { locale: th })}
-                    {sStartISO !== sEndISO && ` – ${format(new Date(`${sEndISO}T00:00:00`), "d MMM yyyy", { locale: th })}`}
+                    {formatBE(new Date(`${sStartISO}T00:00:00`), "d MMM yyyy", { locale: th })}
+                    {sStartISO !== sEndISO && ` – ${formatBE(new Date(`${sEndISO}T00:00:00`), "d MMM yyyy", { locale: th })}`}
                   </p>
                   <p className="text-sm font-semibold mt-1">{s.name}</p>
                   <p className="text-xs text-muted-foreground mt-2">
@@ -223,7 +219,7 @@ export default function Calendar() {
                 >
                   <TaskGlyph taskName={t.taskName} className="w-4 h-4 text-emerald-700 shrink-0 sm:order-first" />
                   <span className="text-xs text-muted-foreground shrink-0 w-20">
-                    {format(new Date(`${t.date}T00:00:00`), "d MMM yyyy", { locale: th })}
+                    {formatBE(new Date(`${t.date}T00:00:00`), "d MMM yyyy", { locale: th })}
                   </span>
                   <span className={`flex-1 font-medium ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>
                     {t.taskName}

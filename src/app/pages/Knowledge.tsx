@@ -1,21 +1,9 @@
 import { useEffect, useState } from "react";
 import { FileText, ExternalLink } from "lucide-react";
 import { Card } from "../components/ui/card";
+import { EmptyState } from "../components/EmptyState";
 import { Button } from "../components/ui/button";
-import { apiFetch, API_BASE_URL } from "../lib/api";
-
-interface DocumentResponse {
-  id: string;
-  filename: string;
-  file_type: string;
-  chroma_collection: string;
-  created_at: string;
-}
-
-interface CollectionItem {
-  value: string;
-  label: string;
-}
+import { fetchDocsAndCollections, API_BASE_URL, type DocumentResponse, type CollectionItem } from "../lib/api";
 
 export default function Knowledge() {
   const [documents, setDocuments] = useState<DocumentResponse[]>([]);
@@ -23,11 +11,8 @@ export default function Knowledge() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      apiFetch<DocumentResponse[]>("/documents/", {}, false),
-      apiFetch<CollectionItem[]>("/documents/collections", {}, false),
-    ])
-      .then(([docs, cols]) => { setDocuments(docs); setCollections(cols); })
+    fetchDocsAndCollections()
+      .then(({ documents, collections }) => { setDocuments(documents); setCollections(collections); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -44,9 +29,7 @@ export default function Knowledge() {
       {loading ? (
         <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
       ) : documents.length === 0 ? (
-        <Card className="p-8 rounded-xl text-center text-muted-foreground text-sm">
-          ยังไม่มีเอกสารในระบบ
-        </Card>
+        <EmptyState message="ยังไม่มีเอกสารในระบบ" />
       ) : (
         <div className="space-y-6">
           {[

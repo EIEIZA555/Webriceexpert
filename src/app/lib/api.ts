@@ -1,5 +1,18 @@
 export const API_BASE_URL = "http://localhost:8000";
 
+export interface DocumentResponse {
+  id: string;
+  filename: string;
+  file_type: string;
+  chroma_collection: string;
+  created_at: string;
+}
+
+export interface CollectionItem {
+  value: string;
+  label: string;
+}
+
 export function getAuthToken(): string | null {
   if (typeof window === "undefined") return null;
   try {
@@ -59,5 +72,16 @@ export async function apiFetch<T>(
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+export async function fetchDocsAndCollections(): Promise<{
+  documents: DocumentResponse[];
+  collections: CollectionItem[];
+}> {
+  const [documents, collections] = await Promise.all([
+    apiFetch<DocumentResponse[]>("/documents/", {}, false),
+    apiFetch<CollectionItem[]>("/documents/collections", {}, false),
+  ]);
+  return { documents, collections };
 }
 

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import type { PlanTask, PlantingPlan, PlanResources } from "../lib/planTypes";
+import type { PlanTask, PlantingPlan, PlanResources, SoilTypeKey } from "../lib/planTypes";
 import { type PlantingMethodKey } from "../lib/plantingMethod";
 import { apiFetch, getAuthToken } from "../lib/api";
 
@@ -24,6 +24,7 @@ interface BackendPlan {
   variety_id: string;
   variety_name: string;
   start_date: string;
+  actual_planting_date: string;
   area_rai: number;
   plot_name: string | null;
   planting_method: string;
@@ -62,10 +63,11 @@ function mapPlan(p: BackendPlan, uuidToCollection: Map<string, string>): Plantin
     varietyId: uuidToCollection.get(p.variety_id) ?? p.variety_id,
     varietyName: p.variety_name,
     startDate: p.start_date,
+    actualPlantingDate: p.actual_planting_date,
     areaRai: p.area_rai,
     plotName: p.plot_name,
     plantingMethod: p.planting_method as PlantingMethodKey,
-    soilType: (p.soil_type ?? "clay") as import("../lib/planGenerator").SoilTypeKey,
+    soilType: (p.soil_type ?? "clay") as SoilTypeKey,
     tasks: p.tasks.map(mapTask),
     resources: p.resources ? {
       seedKg: p.resources.seed_kg,
@@ -119,6 +121,19 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const refreshVarieties = useCallback(async (): Promise<{ uuidMap: Map<string, string>; colMap: Map<string, string> }> => {
+    const varieties = await apiFetch<BackendVariety[]>("/varieties/");
+    const uuidMap = new Map<string, string>();
+    const colMap = new Map<string, string>();
+    varieties.forEach((v) => {
+      uuidMap.set(v.id, v.collection_name);
+      colMap.set(v.collection_name, v.id);
+    });
+    setUuidToCollection(uuidMap);
+    setCollectionToUUID(colMap);
+    return { uuidMap, colMap };
+  }, []);
+
   const fetchPlans = useCallback(async () => {
     if (!getAuthToken()) {
       setPlans([]);
@@ -126,15 +141,7 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      const varieties = await apiFetch<BackendVariety[]>("/varieties/");
-      const uuidMap = new Map<string, string>();
-      const colMap = new Map<string, string>();
-      varieties.forEach((v) => {
-        uuidMap.set(v.id, v.collection_name);
-        colMap.set(v.collection_name, v.id);
-      });
-      setUuidToCollection(uuidMap);
-      setCollectionToUUID(colMap);
+      const { uuidMap } = await refreshVarieties();
 
       const backendPlans = await apiFetch<BackendPlan[]>("/plans/", {}, true);
       const mapped = backendPlans.map((p) => mapPlan(p, uuidMap));
@@ -152,7 +159,7 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshVarieties]);
 
   useEffect(() => {
     fetchPlans();
@@ -161,19 +168,6 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
   const setCurrentPlanId = useCallback((id: string) => {
     localStorage.setItem(CURRENT_PLAN_KEY, id);
     setCurrentPlanIdState(id);
-  }, []);
-
-  const refreshVarieties = useCallback(async (): Promise<{ uuidMap: Map<string, string>; colMap: Map<string, string> }> => {
-    const varieties = await apiFetch<BackendVariety[]>("/varieties/");
-    const uuidMap = new Map<string, string>();
-    const colMap = new Map<string, string>();
-    varieties.forEach((v) => {
-      uuidMap.set(v.id, v.collection_name);
-      colMap.set(v.collection_name, v.id);
-    });
-    setUuidToCollection(uuidMap);
-    setCollectionToUUID(colMap);
-    return { uuidMap, colMap };
   }, []);
 
   const createPlan = useCallback(

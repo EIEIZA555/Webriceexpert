@@ -1,5 +1,6 @@
 import type { PlantingMethodKey } from "./plantingMethod";
-import type { SoilTypeKey } from "./planGenerator";
+
+export type SoilTypeKey = "clay" | "loam" | "sandy";
 
 export interface PlanTask {
   id: string;
@@ -25,6 +26,7 @@ export interface PlantingPlan {
   varietyId: string;
   varietyName: string;
   startDate: string;
+  actualPlantingDate: string;
   areaRai: number;
   plotName: string | null;
   plantingMethod: PlantingMethodKey;

@@ -5,8 +5,10 @@ import { Progress } from "../components/ui/progress";
 import { Badge } from "../components/ui/badge";
 import { Sprout, Plus, Trash2 } from "lucide-react";
 import { usePlans } from "../contexts/PlansContext";
+import LoadingScreen from "../components/LoadingScreen";
 import { getPlantingMethodLabel } from "../lib/plantingMethod";
 import { format } from "date-fns";
+import { formatBE } from "../lib/dateUtils";
 import { th } from "date-fns/locale";
 
 export default function Plots() {
@@ -34,13 +36,7 @@ export default function Plots() {
     navigate(`/app/plots/${id}`);
   };
 
-  if (loading) {
-    return (
-      <div className="p-6 lg:p-10 flex items-center justify-center">
-        <p className="text-muted-foreground text-sm">กำลังโหลด...</p>
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen />;
 
   if (!plans.length) {
     return (
@@ -139,7 +135,7 @@ export default function Plots() {
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">วันที่ปลูก</span>
-                  <span>{format(new Date(plan.startDate), "d MMM yyyy", { locale: th })}</span>
+                  <span>{formatBE(new Date(plan.startDate), "d MMM yyyy", { locale: th })}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">อายุแปลง</span>
