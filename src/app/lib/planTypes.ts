@@ -31,6 +31,7 @@ export interface PlantingPlan {
   plotName: string | null;
   plantingMethod: PlantingMethodKey;
   soilType: SoilTypeKey;
+  isPhotoperiodSensitive: boolean;
   tasks: PlanTask[];
   resources: PlanResources | null;
   createdAt: string;

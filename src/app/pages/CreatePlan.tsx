@@ -18,7 +18,7 @@ export default function CreatePlan() {
   const navigate = useNavigate();
   const { createPlan } = usePlans();
   const [step, setStep] = useState(1);
-  const [varieties, setVarieties] = useState<{ id: string; name: string; supported_methods: string[]; is_photoperiod_sensitive?: boolean; heading_calendar?: string | null }[]>([]);
+  const [varieties, setVarieties] = useState<{ id: string; name: string; supported_methods: string[]; is_photoperiod_sensitive?: boolean }[]>([]);
 
   const [formData, setFormData] = useState({
     variety: "",
@@ -34,14 +34,13 @@ export default function CreatePlan() {
   const [varietyQuery, setVarietyQuery] = useState("");
 
   useEffect(() => {
-    apiFetch<Array<{ collection_name: string; name: string; supported_methods: string[]; is_photoperiod_sensitive: boolean; heading_calendar: string | null }>>("/varieties/")
+    apiFetch<Array<{ collection_name: string; name: string; supported_methods: string[]; is_photoperiod_sensitive: boolean }>>("/varieties/")
       .then((rows) => {
-        setVarieties(rows.map((r) => ({ 
-          id: r.collection_name, 
-          name: r.name, 
+        setVarieties(rows.map((r) => ({
+          id: r.collection_name,
+          name: r.name,
           supported_methods: r.supported_methods,
           is_photoperiod_sensitive: r.is_photoperiod_sensitive,
-          heading_calendar: r.heading_calendar
         })));
       })
       .catch(() => {});
@@ -293,7 +292,7 @@ export default function CreatePlan() {
                     <div>
                       <h4 className="text-sm font-medium text-[#ff8f00]">พันธุ์ข้าวไวแสง (Photosensitive)</h4>
                       <p className="text-xs text-[#ffb300] mt-1 leading-relaxed">
-                        ข้าวพันธุ์นี้จะออกดอกรอบเก็บเกี่ยวตามฤดูกาลตายตัว {selectedVariety.heading_calendar ? `(กำหนดออกดอกประมาณวันที่ ${selectedVariety.heading_calendar.split('-')[0]}/${selectedVariety.heading_calendar.split('-')[1]})` : ""}
+                        ข้าวพันธุ์นี้จะออกดอกตามช่วงแสงของฤดูกาล
                         <br />
                         <span className="font-semibold text-[#ff8f00]">คำแนะนำ:</span> ควรเริ่มเตรียมงานปลูกในช่วง <span className="underline">พฤษภาคม - สิงหาคม</span>
                       </p>

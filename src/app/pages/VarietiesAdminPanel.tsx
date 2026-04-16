@@ -22,6 +22,7 @@ interface Variety {
   collection_name: string;
   harvest_age_days: number;
   is_photoperiod_sensitive: boolean;
+  is_active: boolean;
   supported_methods: string[];
   description: string | null;
   reference_url: string | null;
@@ -34,10 +35,7 @@ interface Variety {
   fert2_formula: string | null;
   fert1_note: string | null;
   fert2_note: string | null;
-  heading_calendar: string | null;
 }
-
-const THAI_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 
 const FIELD_ORDER = [
   "name",
@@ -47,7 +45,7 @@ const FIELD_ORDER = [
   "harvest_age_days",
   "tillering_day",
   "panicle_initiation_day",
-  "heading_calendar",
+  "heading_day",
 ];
 
 const emptyForm = (): Partial<Variety> => ({
@@ -67,7 +65,6 @@ const emptyForm = (): Partial<Variety> => ({
   fert2_formula: "",
   fert1_note: "",
   fert2_note: "",
-  heading_calendar: "",
 });
 
 export default function VarietiesAdminPanel({
@@ -149,21 +146,11 @@ export default function VarietiesAdminPanel({
     if (!editing && !form.collection_name?.trim()) errors.collection_name = "กรุณากรอกรหัสพันธุ์";
     if (form.is_photoperiod_sensitive === undefined) errors.is_photoperiod_sensitive = "กรุณาเลือกว่าไวต่อช่วงแสงหรือไม่";
     if (!form.supported_methods?.length) errors.supported_methods = "เลือกวิธีปลูกอย่างน้อย 1 แบบ";
-    if (
-      form.is_photoperiod_sensitive === false &&
-      (form.harvest_age_days == null || Number(form.harvest_age_days) < 1)
-    )
+    if (form.harvest_age_days == null || Number(form.harvest_age_days) < 1)
       errors.harvest_age_days = "กรุณากรอกอายุเก็บเกี่ยว (วัน)";
     if (form.tillering_day == null) errors.tillering_day = "กรุณากรอกวันแตกกอ";
     if (form.panicle_initiation_day == null) errors.panicle_initiation_day = "กรุณากรอกวันกำเนิดช่อดอก";
-    if (form.is_photoperiod_sensitive === true) {
-      const hc = form.heading_calendar ?? "";
-      const parts = hc.split("-");
-      if (parts.length < 2 || !parts[0] || !parts[1])
-        errors.heading_calendar = "กรุณาเลือกวันตั้งท้องและออกรวงตามปฏิทิน";
-    } else if (form.is_photoperiod_sensitive === false) {
-      if (form.heading_day == null) errors.heading_day = "กรุณากรอกวันตั้งท้องและออกรวง";
-    }
+    if (form.heading_day == null) errors.heading_day = "กรุณากรอกวันตั้งท้องและออกรวง";
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -193,7 +180,6 @@ export default function VarietiesAdminPanel({
         fert2_formula: form.fert2_formula || null,
         fert1_note: form.fert1_note || null,
         fert2_note: form.fert2_note || null,
-        heading_calendar: form.heading_calendar || null,
       };
 
       if (editing) {
@@ -270,12 +256,13 @@ export default function VarietiesAdminPanel({
                   <Sprout className="w-5 h-5 text-emerald-700" />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-foreground truncate">
-                    {v.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground font-mono">
-                    {v.collection_name}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-foreground truncate">{v.name}</p>
+                    {!v.is_active && (
+                      <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">ปิดใช้งาน</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground font-mono">{v.collection_name}</p>
                 </div>
               </div>
             </div>
@@ -312,8 +299,8 @@ export default function VarietiesAdminPanel({
                 แก้ไข
               </Button>
               <DeleteConfirmDialog
-                title={`ลบพันธุ์ ${v.name}?`}
-                description="การลบจะไม่สามารถกู้คืนได้"
+                title={`ปิดใช้งานพันธุ์ ${v.name}?`}
+                description="พันธุ์ข้าวจะไม่แสดงในการสร้างแผน แต่เอกสารและข้อมูลยังคงอยู่"
                 onConfirm={() => handleDelete(v.id)}
               />
             </div>
@@ -397,7 +384,7 @@ export default function VarietiesAdminPanel({
                 >
                   {!editing && <option value="">เลือก…</option>}
                   <option value="no">ไม่ไวต่อแสง</option>
-                  <option value="yes">ไวต่อแสง</option>
+                  <option value="yes">ไวต่อแสง (ปลูกได้เฉพาะ พ.ค.–ส.ค.)</option>
                 </select>
                 <FieldError field="is_photoperiod_sensitive" />
               </div>
@@ -432,21 +419,19 @@ export default function VarietiesAdminPanel({
                 ระยะการเจริญเติบโต (วันนับจากวันปลูก)
               </p>
               <div className="grid grid-cols-2 gap-4">
-                {!form.is_photoperiod_sensitive && (
-                  <div>
-                    <Label className="text-xs">อายุเก็บเกี่ยว (วัน)</Label>
-                    <Input
-                      data-field="harvest_age_days"
-                      type="number"
-                      min={1}
-                      className={`mt-1 rounded-lg ${errClass("harvest_age_days")}`}
-                      placeholder="เช่น 120"
-                      value={num(form.harvest_age_days)}
-                      onChange={(e) => setNum("harvest_age_days", e.target.value)}
-                    />
-                    <FieldError field="harvest_age_days" />
-                  </div>
-                )}
+                <div>
+                  <Label className="text-xs">อายุเก็บเกี่ยว (วัน)</Label>
+                  <Input
+                    data-field="harvest_age_days"
+                    type="number"
+                    min={1}
+                    className={`mt-1 rounded-lg ${errClass("harvest_age_days")}`}
+                    placeholder="เช่น 120"
+                    value={num(form.harvest_age_days)}
+                    onChange={(e) => setNum("harvest_age_days", e.target.value)}
+                  />
+                  <FieldError field="harvest_age_days" />
+                </div>
                 <div>
                   <Label className="text-xs">วันแตกกอ</Label>
                   <Input
@@ -474,102 +459,17 @@ export default function VarietiesAdminPanel({
                   <FieldError field="panicle_initiation_day" />
                 </div>
                 <div>
-                  {form.is_photoperiod_sensitive ? (
-                    <>
-                      <Label className="text-xs">วันตั้งท้องและออกรวงตามปฏิทิน</Label>
-                      <div
-                        data-field="heading_calendar"
-                        className="flex gap-2 mt-1"
-                      >
-                        <select
-                          className={`w-24 h-10 rounded-lg border bg-background px-3 text-sm ${fieldErrors.heading_calendar ? "border-red-500" : "border-input"}`}
-                          value={
-                            form.heading_calendar
-                              ? form.heading_calendar.split("-")[0]
-                              : ""
-                          }
-                          onChange={(e) => {
-                            const d = e.target.value;
-                            const m = form.heading_calendar
-                              ? form.heading_calendar.split("-")[1]
-                              : "01";
-                            setForm((f) => ({
-                              ...f,
-                              heading_calendar: d ? `${d}-${m}` : "",
-                            }));
-                            clearFieldError("heading_calendar");
-                          }}
-                        >
-                          <option value="">วัน</option>
-                          {Array.from({ length: 31 }, (_, i) => i + 1).map(
-                            (d) => (
-                              <option
-                                key={d}
-                                value={String(d).padStart(2, "0")}
-                              >
-                                {d}
-                              </option>
-                            ),
-                          )}
-                        </select>
-                        <select
-                          className={`flex-1 h-10 rounded-lg border bg-background px-3 text-sm ${fieldErrors.heading_calendar ? "border-red-500" : "border-input"}`}
-                          value={
-                            form.heading_calendar
-                              ? form.heading_calendar.split("-")[1]
-                              : ""
-                          }
-                          onChange={(e) => {
-                            const m = e.target.value;
-                            const d = form.heading_calendar
-                              ? form.heading_calendar.split("-")[0]
-                              : "01";
-                            setForm((f) => ({
-                              ...f,
-                              heading_calendar: m ? `${d}-${m}` : "",
-                            }));
-                            clearFieldError("heading_calendar");
-                          }}
-                        >
-                          <option value="">เดือน</option>
-                          {THAI_MONTHS.map((name, i) => (
-                            <option
-                              key={i + 1}
-                              value={String(i + 1).padStart(2, "0")}
-                            >
-                              {name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      {form.heading_calendar &&
-                        form.heading_calendar.includes("-") &&
-                        form.heading_calendar.split("-")[0] &&
-                        form.heading_calendar.split("-")[1] ? (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            ออกรวงทุกปีช่วงวันที่{" "}
-                            {parseInt(form.heading_calendar.split("-")[0])}{" "}
-                            {["", ...THAI_MONTHS][parseInt(form.heading_calendar.split("-")[1])]}
-                          </p>
-                        ) : (
-                          <FieldError field="heading_calendar" />
-                        )}
-                    </>
-                  ) : (
-                    <>
-                      <Label className="text-xs">วันตั้งท้องและออกรวง</Label>
-                      <Input
-                        data-field="heading_day"
-                        type="number"
-                        min={0}
-                        className={`mt-1 rounded-lg ${errClass("heading_day")}`}
-                        placeholder="เช่น 75"
-                        value={num(form.heading_day)}
-                        onChange={(e) => setNum("heading_day", e.target.value)}
-                      />
-                      <FieldError field="heading_day" />
-                    </>
-                  )}
+                  <Label className="text-xs">วันตั้งท้องและออกรวง</Label>
+                  <Input
+                    data-field="heading_day"
+                    type="number"
+                    min={0}
+                    className={`mt-1 rounded-lg ${errClass("heading_day")}`}
+                    placeholder="เช่น 75"
+                    value={num(form.heading_day)}
+                    onChange={(e) => setNum("heading_day", e.target.value)}
+                  />
+                  <FieldError field="heading_day" />
                 </div>
               </div>
             </div>

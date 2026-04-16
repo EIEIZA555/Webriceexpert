@@ -29,6 +29,7 @@ interface BackendPlan {
   plot_name: string | null;
   planting_method: string;
   soil_type: string;
+  is_photoperiod_sensitive: boolean;
   tasks: BackendTask[];
   resources: { seed_kg: number; fertilizer1_kg: number; fertilizer1_formula: string; fertilizer2_kg: number; fertilizer2_formula: string; seedling_trays: number | null } | null;
   created_at: string;
@@ -68,6 +69,7 @@ function mapPlan(p: BackendPlan, uuidToCollection: Map<string, string>): Plantin
     plotName: p.plot_name,
     plantingMethod: p.planting_method as PlantingMethodKey,
     soilType: (p.soil_type ?? "clay") as SoilTypeKey,
+    isPhotoperiodSensitive: p.is_photoperiod_sensitive,
     tasks: p.tasks.map(mapTask),
     resources: p.resources ? {
       seedKg: p.resources.seed_kg,

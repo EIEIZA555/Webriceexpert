@@ -138,6 +138,7 @@ export function FloatingChat() {
 
       return `[บริบทแปลงนาของผู้ใช้]\n` +
         `พันธุ์: ${plan.varietyName}\n` +
+        `ลักษณะพันธุ์: ${plan.isPhotoperiodSensitive ? 'ไวต่อช่วงแสง' : 'ไม่ไวต่อช่วงแสง'}\n` +
         `วิธีปลูก: ${getPlantingMethodLabel(plan.plantingMethod)}\n` +
         `พื้นที่: ${plan.areaRai} ไร่\n` +
         `ประเภทดิน: ${plan.soilType}\n` +
