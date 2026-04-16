@@ -1,3 +1,4 @@
+import React from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -14,14 +15,15 @@ import {
 
 interface Props {
   title: string;
-  description: string;
+  description: string | React.ReactNode;
   onConfirm: () => void;
+  onOpenChange?: (open: boolean) => void;
   triggerClassName?: string;
 }
 
-export function DeleteConfirmDialog({ title, description, onConfirm, triggerClassName }: Props) {
+export function DeleteConfirmDialog({ title, description, onConfirm, onOpenChange, triggerClassName }: Props) {
   return (
-    <AlertDialog>
+    <AlertDialog onOpenChange={onOpenChange}>
       <AlertDialogTrigger asChild>
         <Button
           variant="outline"

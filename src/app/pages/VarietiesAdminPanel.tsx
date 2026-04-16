@@ -81,6 +81,7 @@ export default function VarietiesAdminPanel({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [deleteStats, setDeleteStats] = useState<Record<string, { doc_count: number } | null>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const load = () => {
@@ -210,9 +211,20 @@ export default function VarietiesAdminPanel({
     }
   };
 
+  const fetchDeleteStats = async (id: string) => {
+    if (deleteStats[id] !== undefined) return;
+    try {
+      const stats = await apiFetch<{ doc_count: number }>(`/varieties/${id}/stats`, {}, true);
+      setDeleteStats((s) => ({ ...s, [id]: stats }));
+    } catch {
+      setDeleteStats((s) => ({ ...s, [id]: null }));
+    }
+  };
+
   const handleDelete = async (id: string) => {
     try {
       await apiFetch(`/varieties/${id}`, { method: "DELETE" }, true);
+      setDeleteStats((s) => { const n = { ...s }; delete n[id]; return n; });
       load();
       onVarietiesMutated?.();
     } catch (e) {
@@ -316,8 +328,13 @@ export default function VarietiesAdminPanel({
                 แก้ไข
               </Button>
               <DeleteConfirmDialog
-                title={`ปิดใช้งานพันธุ์ ${v.name}?`}
-                description="พันธุ์ข้าวจะไม่แสดงในการสร้างแผน แต่เอกสารและข้อมูลยังคงอยู่"
+                title={`ลบพันธุ์ ${v.name}?`}
+                description={
+                  deleteStats[v.id] == null
+                    ? "จะลบพันธุ์ข้าวและเอกสารที่เกี่ยวข้องทั้งหมดถาวร แผนที่สร้างไว้แล้วยังใช้งานได้ปกติ"
+                    : `จะลบเอกสาร ${deleteStats[v.id]!.doc_count} ไฟล์ และ ChromaDB collection ถาวร แผนที่สร้างไว้แล้วยังใช้งานได้ปกติ`
+                }
+                onOpenChange={(open) => { if (open) fetchDeleteStats(v.id); }}
                 onConfirm={() => handleDelete(v.id)}
               />
             </div>

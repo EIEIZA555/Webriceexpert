@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -8,11 +8,18 @@ import { isAuthenticated, login, register } from "../lib/auth";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [isRegister, setIsRegister] = useState(searchParams.get("register") === "1");
+  const [isRegister, setIsRegister] = useState(location.pathname === "/register");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const locationState = location.state as any;
+
+  useEffect(() => {
+    setIsRegister(location.pathname === "/register");
+    setError("");
+  }, [location.pathname]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -29,10 +36,12 @@ export default function Login() {
     try {
       if (isRegister) {
         await register(username, password);
+        setLoading(false);
+        navigate("/login", { replace: true, state: { registered: true } });
       } else {
         await login(username, password);
+        navigate("/app/plots", { replace: true });
       }
-      navigate("/app/plots", { replace: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : "ไม่สามารถติดต่อเซิร์ฟเวอร์ได้";
       setError(message);
@@ -139,6 +148,11 @@ export default function Login() {
               </div>
             </div>
 
+            {locationState?.registered && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+                สมัครสมาชิกเรียบร้อย กรุณาเข้าสู่ระบบ
+              </div>
+            )}
             {error && (
               <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                 {error}
@@ -168,14 +182,14 @@ export default function Login() {
             {isRegister ? (
               <>
                 มีบัญชีอยู่แล้ว?{" "}
-                <button type="button" onClick={() => { setIsRegister(false); setError(""); }} className="text-primary hover:underline">
+                <button type="button" onClick={() => navigate("/login")} className="text-primary hover:underline">
                   เข้าสู่ระบบ
                 </button>
               </>
             ) : (
               <>
                 ยังไม่มีบัญชี?{" "}
-                <button type="button" onClick={() => { setIsRegister(true); setError(""); }} className="text-primary hover:underline">
+                <button type="button" onClick={() => navigate("/register")} className="text-primary hover:underline">
                   สมัครสมาชิก
                 </button>
               </>

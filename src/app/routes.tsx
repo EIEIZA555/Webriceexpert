@@ -21,6 +21,10 @@ export const router = createBrowserRouter([
     Component: Login,
   },
   {
+    path: "/register",
+    Component: Login,
+  },
+  {
     path: "/app",
     element: (
       <ProtectedRoute>

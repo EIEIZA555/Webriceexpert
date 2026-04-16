@@ -81,14 +81,10 @@ export async function register(
   username: string,
   password: string,
 ): Promise<void> {
-  const data = await apiFetch<RegisterResponse>("/auth/register", {
+  await apiFetch<RegisterResponse>("/auth/register", {
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
-
-  // register ไม่ return token — login ต่อทันที
-  await login(username, password);
-  void data;
 }
 
 export function clearAuth(): void {

@@ -1,10 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Leaf, Sprout, MessageCircle, BookOpen, FileText, ExternalLink, LogIn, Bot, CalendarDays, BarChart2, SendHorizonal } from "lucide-react";
+import { Leaf, Sprout, MessageCircle, BookOpen, FileText, ExternalLink, LogIn, Bot, CalendarDays, BarChart2, SendHorizonal, UserPlus } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { apiFetch, API_BASE_URL } from "../lib/api";
 import { isAuthenticated } from "../lib/auth";
+
+interface Variety {
+  id: string;
+  name: string;
+  collection_name: string;
+  is_photoperiod_sensitive: boolean;
+  harvest_age_days: number;
+  supported_methods: string[];
+}
 
 interface ChatMessage {
   id: number;
@@ -39,6 +48,7 @@ export default function Landing() {
   const [isLoading, setIsLoading] = useState(false);
   const [documents, setDocuments] = useState<DocumentResponse[]>([]);
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const [varieties, setVarieties] = useState<Variety[]>([]);
   const [activeTab, setActiveTab] = useState<"chat" | "docs">("chat");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -48,6 +58,7 @@ export default function Landing() {
     } else {
       apiFetch<DocumentResponse[]>("/documents/", {}, false).then(setDocuments).catch(() => {});
       apiFetch<PromptTemplate[]>("/prompts/", {}, false).then(setTemplates).catch(() => {});
+      apiFetch<Variety[]>("/varieties/", {}, false).then(setVarieties).catch(() => {});
     }
   }, []);
 
@@ -86,14 +97,19 @@ export default function Landing() {
             <Leaf className="w-7 h-7 text-primary" />
             <span className="text-lg font-semibold">Rice Expert</span>
           </div>
-          <Button
-            onClick={() => navigate("/login")}
-            className="bg-primary hover:bg-primary/90 rounded-lg gap-2"
-            size="sm"
-          >
-            <LogIn className="w-4 h-4" />
-            เข้าสู่ระบบ
-          </Button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate("/login")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              เข้าสู่ระบบ
+            </button>
+            <Button
+              onClick={() => navigate("/register")}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg gap-1.5"
+              size="sm"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              สมัครสมาชิก
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -101,9 +117,10 @@ export default function Landing() {
       <div className="bg-white border-b border-border">
         <div className="max-w-5xl mx-auto px-4 py-10 text-center">
           <h1 className="text-2xl font-semibold mb-2">ระบบผู้เชี่ยวชาญการปลูกข้าว</h1>
-          <p className="text-muted-foreground text-sm mb-8">
+          <p className="text-muted-foreground text-sm mb-6">
             ใช้ AI ช่วยตอบคำถามเรื่องข้าวได้ทันที หรือเข้าสู่ระบบเพื่อวางแผนและติดตามแปลงนาของคุณ
           </p>
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-left">
             {[
               { icon: Bot, label: "ถาม-ตอบด้วย AI", desc: "ถามเรื่องโรค ปุ๋ย การดูแลข้าวได้ทันที" },
@@ -124,6 +141,30 @@ export default function Landing() {
           </div>
         </div>
       </div>
+
+      {/* Varieties */}
+      {varieties.length > 0 && (
+        <div className="bg-slate-50/60 border-b border-border">
+          <div className="max-w-5xl mx-auto px-4 py-6">
+            <p className="text-sm font-medium text-foreground mb-3">พันธุ์ข้าวที่รองรับ</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {varieties.map((v) => (
+                <div key={v.id} className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-border">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                    <Sprout className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{v.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {v.is_photoperiod_sensitive ? "ไวแสง" : `${v.harvest_age_days} วัน`}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="max-w-5xl mx-auto w-full px-4 pt-6 flex gap-2">

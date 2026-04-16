@@ -7,16 +7,13 @@ import {
   Calendar,
   Circle,
   CheckCircle2,
-  Sprout,
   ArrowLeft,
   MapPin,
 } from "lucide-react";
-import { usePlans, type PlanTask } from "../contexts/PlansContext";
+import { usePlans } from "../contexts/PlansContext";
 import { motion } from "motion/react";
-import { format } from "date-fns";
 import { formatBE } from "../lib/dateUtils";
 import { th } from "date-fns/locale";
-import { addDaysToISODate } from "../lib/planGenerator";
 import { getPlantingMethodLabel } from "../lib/plantingMethod";
 import { TaskGlyph } from "../lib/taskIcons";
 import LoadingScreen from "../components/LoadingScreen";
@@ -24,16 +21,14 @@ import LoadingScreen from "../components/LoadingScreen";
 export default function PlotDashboard() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [taskView, setTaskView] = useState<"upcoming" | "all">("upcoming");
+  const [taskView, setTaskView] = useState<"today" | "all">("today");
 
   const {
-    plans,
     plan,
     loading,
     setCurrentPlanId,
     toggleTask,
     getDaysSinceStart,
-    getUpcomingTasks,
     getCurrentStageName,
     getProgressPercent,
   } = usePlans();
@@ -63,38 +58,11 @@ export default function PlotDashboard() {
   const daysSinceStart = getDaysSinceStart();
   const progressPercent = getProgressPercent();
   const currentStage = getCurrentStageName() ?? "เก็บเกี่ยวแล้ว";
-  const upcomingTasks = getUpcomingTasks(30);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const future30 = new Date(today);
-  future30.setDate(future30.getDate() + 30);
-  const hasTasksIn30Days = activePlot.tasks.some((t) => {
-    const d = new Date(`${t.date}T00:00:00`);
-    return d >= today && d <= future30;
-  });
-  const upcomingLabel = hasTasksIn30Days ? "งานที่ต้องทำ" : "งานถัดไปที่ต้องทำ";
-
-  // group tasks ตาม stage จาก backend
-  const stageMap = new Map<string, { startDay: number; endDay: number; tasks: PlanTask[] }>();
-  for (const t of activePlot.tasks) {
-    if (!stageMap.has(t.stage)) {
-      stageMap.set(t.stage, { startDay: t.day, endDay: t.day, tasks: [] });
-    }
-    const s = stageMap.get(t.stage)!;
-    s.startDay = Math.min(s.startDay, t.day);
-    s.endDay = Math.max(s.endDay, t.day);
-    s.tasks.push(t);
-  }
-  const stages = Array.from(stageMap.entries()).map(([name, s]) => ({ name, ...s }));
-
-  // แปลง daysSinceStart (นับจาก task แรก) → วันเทียบกับวันปลูก (day 0)
-  const minTaskDay = activePlot.tasks.length > 0 ? Math.min(...activePlot.tasks.map(t => t.day)) : 0;
-  const currentDayRelativeToPanting = daysSinceStart + minTaskDay;
-
-  const currentSubLabel = stages.find(
-    (s) => currentDayRelativeToPanting >= s.startDay && currentDayRelativeToPanting <= s.endDay
-  )?.name ?? "-";
+  const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const todayTasks = activePlot.tasks.filter((t) => t.date === todayISO);
 
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto">
@@ -187,12 +155,12 @@ export default function PlotDashboard() {
           </Card>
 
           <Card className="p-6 rounded-2xl border border-slate-100 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-            <p className="text-sm text-muted-foreground mb-1">งานที่กำลังจะมาถึง</p>
+            <p className="text-sm text-muted-foreground mb-1">งานวันนี้</p>
             <p className="text-3xl font-bold text-emerald-600 tracking-tight">
-              {upcomingTasks.length}
+              {todayTasks.length}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              {upcomingTasks.filter((t) => t.isCompleted).length}/{upcomingTasks.length} ทำเสร็จ
+              {todayTasks.filter((t) => t.isCompleted).length}/{todayTasks.length} ทำเสร็จ
             </p>
           </Card>
         </div>
@@ -231,23 +199,28 @@ export default function PlotDashboard() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
             <div>
               <div className="flex items-center gap-3">
-                <h3 className="text-base font-semibold text-foreground">รายการงาน (Checklist)</h3>
-                <Badge variant="secondary" className="w-fit bg-emerald-50 text-emerald-700 border-0 text-xs">
-                  {upcomingTasks.filter((t) => t.isCompleted).length}/{upcomingTasks.length} ช่วงนี้เสร็จแล้ว
-                </Badge>
+                <h3 className="text-base font-semibold text-foreground">รายการงาน</h3>
+                {taskView === "today" && (
+                  <p className="text-xs text-muted-foreground">{formatBE(today, "EEE d MMM yyyy", { locale: th })}</p>
+                )}
+                {taskView === "all" && (
+                  <Badge variant="secondary" className="w-fit bg-emerald-50 text-emerald-700 border-0 text-xs">
+                    {activePlot.tasks.filter((t) => t.isCompleted).length}/{activePlot.tasks.length} เสร็จแล้ว
+                  </Badge>
+                )}
               </div>
             </div>
-            
+
             <div className="flex bg-slate-100/80 p-1 rounded-xl shrink-0">
               <button
-                onClick={() => setTaskView("upcoming")}
+                onClick={() => setTaskView("today")}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  taskView === "upcoming"
+                  taskView === "today"
                     ? "bg-white text-emerald-700 shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                งานช่วงนี้ (30 วัน)
+                งานวันนี้
               </button>
               <button
                 onClick={() => setTaskView("all")}
@@ -262,13 +235,13 @@ export default function PlotDashboard() {
             </div>
           </div>
 
-          {(taskView === "upcoming" ? upcomingTasks : activePlot.tasks).length === 0 ? (
+          {(taskView === "today" ? todayTasks : activePlot.tasks).length === 0 ? (
             <p className="text-muted-foreground text-sm py-8 text-center bg-slate-50/50 rounded-xl border border-slate-100 border-dashed">
-              ไม่มีงานที่ต้องทำ หรือทำครบแล้ว
+              {taskView === "today" ? "ไม่มีงานที่กำหนดไว้วันนี้" : "ไม่มีงานในแผน"}
             </p>
           ) : (
             <div className={`space-y-2 ${taskView === "all" ? "max-h-[500px] overflow-y-auto pr-2 [scrollbar-gutter:stable]" : ""}`}>
-              {(taskView === "upcoming" ? upcomingTasks : activePlot.tasks).map((task) => {
+              {(taskView === "today" ? todayTasks : activePlot.tasks).map((task) => {
                 const isOverdue = !task.isCompleted && new Date(`${task.date}T00:00:00`) < today;
                 
                 return (
@@ -326,54 +299,6 @@ export default function PlotDashboard() {
               })}
             </div>
           )}
-        </Card>
-
-        {/* Milestones */}
-        <Card className="p-6 rounded-2xl border border-slate-100 bg-white">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div>
-              <h3 className="text-base font-semibold text-foreground">ระยะการเจริญเติบโต</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                ช่วงวันของแต่ละระยะตามพันธุ์
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Sprout className="w-4 h-4 text-emerald-600" />
-              <span>{activePlot.varietyName}</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
-            {stages.map((s) => {
-              const isCurrent = currentDayRelativeToPanting >= s.startDay && currentDayRelativeToPanting <= s.endDay;
-              const sStartISO = addDaysToISODate(activePlot.startDate, s.startDay);
-              const sEndISO = addDaysToISODate(activePlot.startDate, s.endDay);
-              const sTasks = s.tasks;
-
-              return (
-                <div
-                  key={s.name}
-                  className={`p-4 rounded-xl border transition-colors ${
-                    isCurrent ? "bg-emerald-50/70 border-emerald-200" : "bg-slate-50/40 border-slate-100"
-                  }`}
-                >
-                  <p className="text-xs text-muted-foreground">
-                    {formatBE(new Date(`${sStartISO}T00:00:00`), "d MMM yyyy", { locale: th })}
-                    {sStartISO !== sEndISO && ` – ${formatBE(new Date(`${sEndISO}T00:00:00`), "d MMM yyyy", { locale: th })}`}
-                  </p>
-                  <p className="font-semibold mt-1 text-sm text-foreground">{s.name}</p>
-                  {sTasks.map((t) => (
-                    <div key={t.id} className="mt-2">
-                      <p className="text-xs text-muted-foreground">งาน: {t.taskName}</p>
-                      {t.description && (
-                        <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{t.description}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
         </Card>
 
       </motion.div>
