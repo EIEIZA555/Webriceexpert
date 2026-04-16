@@ -261,7 +261,14 @@ export default function CreatePlan() {
                     <Calendar
                       mode="single"
                       selected={formData.plantDate ? new Date(`${formData.plantDate}T00:00:00`) : undefined}
-                      disabled={{ before: new Date() }}
+                      disabled={(date) => {
+                        if (date < new Date(new Date().setHours(0,0,0,0))) return true;
+                        if (selectedVariety?.is_photoperiod_sensitive) {
+                          const m = date.getMonth() + 1; // 1-12
+                          return m < 5 || m > 8;
+                        }
+                        return false;
+                      }}
                       onSelect={(date) => {
                         if (date) {
                           const yyyy = date.getFullYear();
