@@ -143,14 +143,19 @@ export default function VarietiesAdminPanel({
     const errors: Record<string, string> = {};
 
     if (!form.name?.trim()) errors.name = "กรุณากรอกชื่อพันธุ์";
-    if (!editing && !form.collection_name?.trim()) errors.collection_name = "กรุณากรอกรหัสพันธุ์";
-    if (form.is_photoperiod_sensitive === undefined) errors.is_photoperiod_sensitive = "กรุณาเลือกว่าไวต่อช่วงแสงหรือไม่";
-    if (!form.supported_methods?.length) errors.supported_methods = "เลือกวิธีปลูกอย่างน้อย 1 แบบ";
+    if (!editing && !form.collection_name?.trim())
+      errors.collection_name = "กรุณากรอกรหัสพันธุ์";
+    if (form.is_photoperiod_sensitive === undefined)
+      errors.is_photoperiod_sensitive = "กรุณาเลือกว่าไวต่อช่วงแสงหรือไม่";
+    if (!form.supported_methods?.length)
+      errors.supported_methods = "เลือกวิธีปลูกอย่างน้อย 1 แบบ";
     if (form.harvest_age_days == null || Number(form.harvest_age_days) < 1)
       errors.harvest_age_days = "กรุณากรอกอายุเก็บเกี่ยว (วัน)";
     if (form.tillering_day == null) errors.tillering_day = "กรุณากรอกวันแตกกอ";
-    if (form.panicle_initiation_day == null) errors.panicle_initiation_day = "กรุณากรอกวันกำเนิดช่อดอก";
-    if (form.heading_day == null) errors.heading_day = "กรุณากรอกวันตั้งท้องและออกรวง";
+    if (form.panicle_initiation_day == null)
+      errors.panicle_initiation_day = "กรุณากรอกวันกำเนิดช่อดอก";
+    if (form.heading_day == null)
+      errors.heading_day = "กรุณากรอกวันตั้งท้องและออกรวง";
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -242,7 +247,9 @@ export default function VarietiesAdminPanel({
         </Button>
       </div>
 
-      {varieties.length === 0 && <EmptyState message="ยังไม่มีพันธุ์ข้าวในระบบ" />}
+      {varieties.length === 0 && (
+        <EmptyState message="ยังไม่มีพันธุ์ข้าวในระบบ" />
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {varieties.map((v) => (
@@ -257,12 +264,18 @@ export default function VarietiesAdminPanel({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold text-foreground truncate">{v.name}</p>
+                    <p className="font-semibold text-foreground truncate">
+                      {v.name}
+                    </p>
                     {!v.is_active && (
-                      <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">ปิดใช้งาน</span>
+                      <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                        ปิดใช้งาน
+                      </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground font-mono">{v.collection_name}</p>
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {v.collection_name}
+                  </p>
                 </div>
               </div>
             </div>
@@ -273,7 +286,10 @@ export default function VarietiesAdminPanel({
             <p className="text-xs text-muted-foreground mb-2">
               วิธีปลูก:{" "}
               {v.supported_methods
-                .map((m) => PLANTING_METHODS.find((pm) => pm.key === m)?.label ?? m)
+                .map(
+                  (m) =>
+                    PLANTING_METHODS.find((pm) => pm.key === m)?.label ?? m,
+                )
                 .join(", ")}
             </p>
             {(v.tillering_day || v.panicle_initiation_day || v.heading_day) && (
@@ -285,7 +301,8 @@ export default function VarietiesAdminPanel({
             )}
             {(v.fert1_rate || v.fert2_rate) && (
               <p className="text-xs text-muted-foreground mb-3">
-                ปุ๋ย 1: {v.fert1_rate ?? "-"} กก./ไร่ • ปุ๋ย 2: {v.fert2_rate ?? "-"} กก./ไร่
+                ปุ๋ย 1: {v.fert1_rate ?? "-"} กก./ไร่ • ปุ๋ย 2:{" "}
+                {v.fert2_rate ?? "-"} กก./ไร่
               </p>
             )}
             <div className="flex gap-2">
@@ -337,7 +354,10 @@ export default function VarietiesAdminPanel({
                     placeholder="เช่น jasmine, rd43, kk15"
                     value={form.collection_name ?? ""}
                     onChange={(e) => {
-                      setForm((f) => ({ ...f, collection_name: e.target.value }));
+                      setForm((f) => ({
+                        ...f,
+                        collection_name: e.target.value,
+                      }));
                       clearFieldError("collection_name");
                     }}
                   />
@@ -377,23 +397,21 @@ export default function VarietiesAdminPanel({
                     const v = e.target.value;
                     setForm((f) => ({
                       ...f,
-                      is_photoperiod_sensitive: v === "" ? undefined : v === "yes",
+                      is_photoperiod_sensitive:
+                        v === "" ? undefined : v === "yes",
                     }));
                     clearFieldError("is_photoperiod_sensitive");
                   }}
                 >
                   {!editing && <option value="">เลือก…</option>}
                   <option value="no">ไม่ไวต่อแสง</option>
-                  <option value="yes">ไวต่อแสง (ปลูกได้เฉพาะ พ.ค.–ส.ค.)</option>
+                  <option value="yes">ไวต่อแสง</option>
                 </select>
                 <FieldError field="is_photoperiod_sensitive" />
               </div>
               <div className={editing ? "" : "col-span-2"}>
                 <Label>วิธีปลูกที่รองรับ</Label>
-                <div
-                  data-field="supported_methods"
-                  className="flex gap-4 mt-2"
-                >
+                <div data-field="supported_methods" className="flex gap-4 mt-2">
                   {PLANTING_METHODS.map((m) => (
                     <label
                       key={m.key}
@@ -402,7 +420,9 @@ export default function VarietiesAdminPanel({
                       <input
                         type="checkbox"
                         className="accent-emerald-600 w-4 h-4 cursor-pointer"
-                        checked={form.supported_methods?.includes(m.key) ?? false}
+                        checked={
+                          form.supported_methods?.includes(m.key) ?? false
+                        }
                         onChange={() => toggleMethod(m.key)}
                       />
                       {m.label}
@@ -454,7 +474,9 @@ export default function VarietiesAdminPanel({
                     className={`mt-1 rounded-lg ${errClass("panicle_initiation_day")}`}
                     placeholder="เช่น 50"
                     value={num(form.panicle_initiation_day)}
-                    onChange={(e) => setNum("panicle_initiation_day", e.target.value)}
+                    onChange={(e) =>
+                      setNum("panicle_initiation_day", e.target.value)
+                    }
                   />
                   <FieldError field="panicle_initiation_day" />
                 </div>
@@ -502,7 +524,10 @@ export default function VarietiesAdminPanel({
                       placeholder="16-20-0"
                       value={form.fert1_formula ?? ""}
                       onChange={(e) =>
-                        setForm((f) => ({ ...f, fert1_formula: e.target.value }))
+                        setForm((f) => ({
+                          ...f,
+                          fert1_formula: e.target.value,
+                        }))
                       }
                     />
                   </div>
@@ -544,7 +569,10 @@ export default function VarietiesAdminPanel({
                       placeholder="46-0-0"
                       value={form.fert2_formula ?? ""}
                       onChange={(e) =>
-                        setForm((f) => ({ ...f, fert2_formula: e.target.value }))
+                        setForm((f) => ({
+                          ...f,
+                          fert2_formula: e.target.value,
+                        }))
                       }
                     />
                   </div>
