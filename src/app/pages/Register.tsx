@@ -1,19 +1,18 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router";
+import { useNavigate } from "react-router";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Leaf, LogIn, Eye, EyeOff, Bot, CalendarDays, BarChart2, BookOpen, ArrowLeft } from "lucide-react";
-import { isAuthenticated, login } from "../lib/auth";
+import { Leaf, UserPlus, Eye, EyeOff, Bot, CalendarDays, BarChart2, BookOpen, ArrowLeft } from "lucide-react";
+import { isAuthenticated, register } from "../lib/auth";
 
-export default function Login() {
+export default function Register() {
   const navigate = useNavigate();
-  const location = useLocation();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const locationState = location.state as any;
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -25,11 +24,15 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (password !== confirmPassword) {
+      setError("รหัสผ่านไม่ตรงกัน");
+      return;
+    }
     setError("");
     setLoading(true);
     try {
-      await login(username, password);
-      navigate("/app/plots", { replace: true });
+      await register(username, password);
+      navigate("/login", { replace: true, state: { registered: true } });
     } catch (err) {
       const message = err instanceof Error ? err.message : "ไม่สามารถติดต่อเซิร์ฟเวอร์ได้";
       setError(message);
@@ -50,7 +53,7 @@ export default function Login() {
 
         <div className="text-white">
           <h2 className="text-3xl font-semibold mb-2">ระบบผู้เชี่ยวชาญการปลูกข้าว</h2>
-          <p className="text-white/70 text-sm mb-10">เข้าสู่ระบบเพื่อใช้งานฟีเจอร์ครบถ้วน</p>
+          <p className="text-white/70 text-sm mb-10">สมัครสมาชิกเพื่อใช้งานฟีเจอร์ครบถ้วน</p>
           <div className="space-y-4">
             {[
               { icon: Bot, label: "ถาม-ตอบด้วย AI", desc: "ถามเรื่องโรค ปุ๋ย การดูแลข้าวได้ทันที" },
@@ -86,8 +89,8 @@ export default function Login() {
           </button>
 
           <div className="mb-8">
-            <h2 className="text-2xl font-semibold mb-1">ยินดีต้อนรับ</h2>
-            <p className="text-sm text-muted-foreground">เข้าสู่ระบบเพื่อใช้งานระบบผู้เชี่ยวชาญการปลูกข้าว</p>
+            <h2 className="text-2xl font-semibold mb-1">สมัครสมาชิก</h2>
+            <p className="text-sm text-muted-foreground">สร้างบัญชีเพื่อบันทึกแผนและประวัติการใช้งาน</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -115,7 +118,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(""); }}
                   className="rounded-lg pr-10"
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   required
                 />
                 <button
@@ -129,11 +132,33 @@ export default function Login() {
               </div>
             </div>
 
-            {locationState?.registered && (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-                สมัครสมาชิกเรียบร้อย กรุณาเข้าสู่ระบบ
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">ยืนยันรหัสผ่าน</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="กรอกรหัสผ่านอีกครั้ง"
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setError(""); }}
+                  className={`rounded-lg pr-10 ${confirmPassword && password !== confirmPassword ? "border-red-400 focus-visible:ring-red-400" : ""}`}
+                  autoComplete="new-password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showConfirmPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
-            )}
+              {confirmPassword && password !== confirmPassword && (
+                <p className="text-xs text-red-500">รหัสผ่านไม่ตรงกัน</p>
+              )}
+            </div>
+
             {error && (
               <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                 {error}
@@ -142,27 +167,27 @@ export default function Login() {
 
             <Button
               type="submit"
-              disabled={loading || !username.trim() || !password}
+              disabled={loading || !username.trim() || !password || !confirmPassword}
               className="w-full rounded-lg h-11 bg-primary hover:bg-primary/90 disabled:opacity-50"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  กำลังเข้าสู่ระบบ...
+                  กำลังสมัครสมาชิก...
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  <LogIn size={18} />
-                  เข้าสู่ระบบ
+                  <UserPlus size={18} />
+                  สมัครสมาชิก
                 </span>
               )}
             </Button>
           </form>
 
           <p className="text-center text-sm text-muted-foreground mt-6">
-            ยังไม่มีบัญชี?{" "}
-            <button type="button" onClick={() => navigate("/register")} className="text-primary hover:underline">
-              สมัครสมาชิก
+            มีบัญชีอยู่แล้ว?{" "}
+            <button type="button" onClick={() => navigate("/login")} className="text-primary hover:underline">
+              เข้าสู่ระบบ
             </button>
           </p>
         </div>

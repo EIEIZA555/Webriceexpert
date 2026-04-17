@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from "react-router";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AppLayout } from "./components/AppLayout";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import Landing from "./pages/Landing";
 import Plots from "./pages/Plots";
 import PlotDashboard from "./pages/PlotDashboard";
@@ -22,7 +23,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/register",
-    Component: Login,
+    Component: Register,
   },
   {
     path: "/app",
