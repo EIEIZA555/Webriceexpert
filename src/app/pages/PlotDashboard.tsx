@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   ArrowLeft,
   MapPin,
+  Pencil,
+  Copy,
 } from "lucide-react";
 import { usePlans } from "../contexts/PlansContext";
 import { motion } from "motion/react";
@@ -17,6 +19,17 @@ import { th } from "date-fns/locale";
 import { getPlantingMethodLabel } from "../lib/plantingMethod";
 import { TaskGlyph } from "../lib/taskIcons";
 import LoadingScreen from "../components/LoadingScreen";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import type { SoilTypeKey } from "../lib/planTypes";
 
 export default function PlotDashboard() {
   const { id } = useParams();
@@ -28,10 +41,25 @@ export default function PlotDashboard() {
     loading,
     setCurrentPlanId,
     toggleTask,
+    updatePlan,
+    clonePlan,
     getDaysSinceStart,
     getCurrentStageName,
     getProgressPercent,
   } = usePlans();
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editPlotName, setEditPlotName] = useState("");
+  const [editAreaRai, setEditAreaRai] = useState("");
+  const [editSoilType, setEditSoilType] = useState<SoilTypeKey>("clay");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [cloneStartDate, setCloneStartDate] = useState("");
+  const [clonePlotName, setClonePlotName] = useState("");
+  const [cloneSaving, setCloneSaving] = useState(false);
+  const [cloneError, setCloneError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -99,6 +127,33 @@ export default function PlotDashboard() {
         <div className="flex gap-2 shrink-0">
           <Button
             variant="outline"
+            onClick={() => {
+              setEditPlotName(activePlot.plotName ?? "");
+              setEditAreaRai(String(activePlot.areaRai));
+              setEditSoilType(activePlot.soilType);
+              setEditError(null);
+              setEditOpen(true);
+            }}
+            className="rounded-xl h-11 px-4"
+          >
+            <Pencil className="w-4 h-4 mr-2" />
+            แก้ไข
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setCloneStartDate("");
+              setClonePlotName(activePlot.plotName ? `${activePlot.plotName} (สำเนา)` : "");
+              setCloneError(null);
+              setCloneOpen(true);
+            }}
+            className="rounded-xl h-11 px-4"
+          >
+            <Copy className="w-4 h-4 mr-2" />
+            โคลน
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => navigate("/app/plots")}
             className="rounded-xl h-11 px-6"
           >
@@ -107,6 +162,151 @@ export default function PlotDashboard() {
           </Button>
         </div>
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>แก้ไขแผน</DialogTitle>
+            <DialogDescription>
+              แก้ชื่อแปลง พื้นที่ หรือประเภทดิน — ระบบจะคำนวณเมล็ด/ปุ๋ยใหม่
+              ส่วนรายการงานและความคืบหน้าเดิมจะยังอยู่
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-plot-name">ชื่อแปลง</Label>
+              <Input
+                id="edit-plot-name"
+                value={editPlotName}
+                onChange={(e) => setEditPlotName(e.target.value)}
+                placeholder="เช่น แปลงข้างบ้าน"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-area-rai">พื้นที่ (ไร่)</Label>
+              <Input
+                id="edit-area-rai"
+                type="number"
+                step="0.1"
+                min="0.1"
+                value={editAreaRai}
+                onChange={(e) => setEditAreaRai(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-soil-type">ประเภทดิน</Label>
+              <select
+                id="edit-soil-type"
+                value={editSoilType}
+                onChange={(e) => setEditSoilType(e.target.value as SoilTypeKey)}
+                className="w-full px-3 py-2 rounded-md border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              >
+                <option value="clay">ดินเหนียว</option>
+                <option value="loam">ดินร่วน</option>
+                <option value="sandy">ดินทราย</option>
+              </select>
+            </div>
+            {editError && <p className="text-sm text-red-600">{editError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={editSaving}>
+              ยกเลิก
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700"
+              disabled={editSaving}
+              onClick={async () => {
+                const area = parseFloat(editAreaRai);
+                if (!Number.isFinite(area) || area <= 0) {
+                  setEditError("กรุณาระบุพื้นที่ที่ถูกต้อง");
+                  return;
+                }
+                setEditSaving(true);
+                setEditError(null);
+                try {
+                  await updatePlan(activePlot.id, {
+                    plotName: editPlotName.trim() || undefined,
+                    areaRai: area,
+                    soilType: editSoilType,
+                  });
+                  setEditOpen(false);
+                } catch (e) {
+                  setEditError((e as Error).message);
+                } finally {
+                  setEditSaving(false);
+                }
+              }}
+            >
+              {editSaving ? "กำลังบันทึก..." : "บันทึก"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cloneOpen} onOpenChange={setCloneOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>โคลนแผน</DialogTitle>
+            <DialogDescription>
+              สร้างแผนใหม่โดยใช้พันธุ์/วิธีปลูก/พื้นที่/ดินเดิม —
+              ระบบจะสร้างรายการงานใหม่จากวันเริ่มที่เลือก
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="clone-start-date">วันเริ่ม (Day 0)</Label>
+              <Input
+                id="clone-start-date"
+                type="date"
+                value={cloneStartDate}
+                onChange={(e) => setCloneStartDate(e.target.value)}
+              />
+              {activePlot.isPhotoperiodSensitive && (
+                <p className="text-xs text-amber-600">
+                  ข้าวไวแสง — ต้องเริ่มในเดือน ก.ค. หรือ ส.ค.
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="clone-plot-name">ชื่อแปลงใหม่</Label>
+              <Input
+                id="clone-plot-name"
+                value={clonePlotName}
+                onChange={(e) => setClonePlotName(e.target.value)}
+                placeholder="เว้นว่างได้"
+              />
+            </div>
+            {cloneError && <p className="text-sm text-red-600">{cloneError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCloneOpen(false)} disabled={cloneSaving}>
+              ยกเลิก
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700"
+              disabled={cloneSaving || !cloneStartDate}
+              onClick={async () => {
+                setCloneSaving(true);
+                setCloneError(null);
+                try {
+                  const newPlan = await clonePlan(activePlot.id, {
+                    startDate: cloneStartDate,
+                    plotName: clonePlotName.trim() || undefined,
+                  });
+                  setCloneOpen(false);
+                  navigate(`/app/plots/${newPlan.id}`);
+                } catch (e) {
+                  setCloneError((e as Error).message);
+                } finally {
+                  setCloneSaving(false);
+                }
+              }}
+            >
+              {cloneSaving ? "กำลังโคลน..." : "สร้างแผนใหม่"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 mb-8">

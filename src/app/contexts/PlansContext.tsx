@@ -99,6 +99,14 @@ interface PlansContextValue {
     soilType: string;
   }) => Promise<PlantingPlan>;
   toggleTask: (planId: string, taskId: string) => Promise<void>;
+  updatePlan: (
+    planId: string,
+    updates: { plotName?: string; areaRai?: number; soilType?: SoilTypeKey },
+  ) => Promise<PlantingPlan>;
+  clonePlan: (
+    planId: string,
+    params: { startDate: string; plotName?: string },
+  ) => Promise<PlantingPlan>;
   deletePlan: (planId: string) => Promise<void>;
   getDaysSinceStart: () => number;
   getTotalDays: () => number;
@@ -224,6 +232,50 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const updatePlan = useCallback(
+    async (
+      planId: string,
+      updates: { plotName?: string; areaRai?: number; soilType?: SoilTypeKey },
+    ) => {
+      const body: Record<string, unknown> = {};
+      if (updates.plotName !== undefined) body.plot_name = updates.plotName;
+      if (updates.areaRai !== undefined) body.area_rai = updates.areaRai;
+      if (updates.soilType !== undefined) body.soil_type = updates.soilType;
+
+      const backendPlan = await apiFetch<BackendPlan>(
+        `/plans/${planId}`,
+        { method: "PATCH", body: JSON.stringify(body) },
+        true,
+      );
+      const updated = mapPlan(backendPlan, uuidToCollection);
+      setPlans((prev) => prev.map((p) => (p.id === planId ? updated : p)));
+      return updated;
+    },
+    [uuidToCollection],
+  );
+
+  const clonePlan = useCallback(
+    async (planId: string, params: { startDate: string; plotName?: string }) => {
+      const { uuidMap } = await refreshVarieties();
+      const backendPlan = await apiFetch<BackendPlan>(
+        `/plans/${planId}/clone`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            start_date: params.startDate,
+            plot_name: params.plotName ?? null,
+          }),
+        },
+        true,
+      );
+      const newPlan = mapPlan(backendPlan, uuidMap);
+      setPlans((prev) => [...prev, newPlan]);
+      setCurrentPlanId(newPlan.id);
+      return newPlan;
+    },
+    [refreshVarieties, setCurrentPlanId],
+  );
+
   const deletePlan = useCallback(
     async (planId: string) => {
       await apiFetch<void>(`/plans/${planId}`, { method: "DELETE" }, true);
@@ -318,6 +370,8 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
         setCurrentPlanId,
         createPlan,
         toggleTask,
+        updatePlan,
+        clonePlan,
         deletePlan,
         getDaysSinceStart,
         getTotalDays,

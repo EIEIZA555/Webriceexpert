@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Leaf, Sprout, MessageCircle, BookOpen, FileText, ExternalLink, LogIn, Bot, CalendarDays, BarChart2, SendHorizonal, UserPlus } from "lucide-react";
+import { Leaf, Sprout, MessageCircle, BookOpen, FileText, ExternalLink, Bot, CalendarDays, BarChart2, SendHorizonal, UserPlus } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { apiFetch, API_BASE_URL } from "../lib/api";

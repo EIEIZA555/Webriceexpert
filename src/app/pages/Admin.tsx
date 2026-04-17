@@ -3,9 +3,9 @@ import {
   FileText,
   Upload,
   ExternalLink,
-  HelpCircle,
   MessageSquare,
   Plus,
+  Sparkles,
   Sprout,
   Users,
 } from "lucide-react";
@@ -23,7 +23,7 @@ import VarietiesAdminPanel from "./VarietiesAdminPanel";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 
-type Tab = "users" | "docs" | "faq" | "prompts" | "varieties";
+type Tab = "users" | "docs" | "prompts" | "varieties";
 
 interface UserResponse {
   id: string;
@@ -41,33 +41,6 @@ interface PromptTemplate {
   title: string;
   content: string;
   created_at: string;
-}
-
-function FaqTab({ faq, faqLoading }: { faq: FaqItem[]; faqLoading: boolean }) {
-  return (
-    <div className="space-y-4">
-      <h3 className="font-medium">คำถามที่ถามบ่อย ({faq.length})</h3>
-      {faqLoading ? (
-        <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
-      ) : faq.length === 0 ? (
-        <EmptyState message="ยังไม่มีประวัติการสนทนา" />
-      ) : (
-        <div className="divide-y divide-border border border-border rounded-xl overflow-hidden bg-white">
-          {faq.map((item, i) => (
-            <div key={i} className="flex items-baseline gap-4 px-5 py-3">
-              <span className="text-xs text-muted-foreground w-4 shrink-0">
-                {i + 1}
-              </span>
-              <p className="flex-1 text-sm">{item.question}</p>
-              <span className="text-xs text-muted-foreground shrink-0">
-                {item.count} ครั้ง
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export default function Admin() {
@@ -102,6 +75,7 @@ export default function Admin() {
   const [newContent, setNewContent] = useState("");
   const [promptsError, setPromptsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const refreshDocumentCollections = useCallback(() => {
     apiFetch<CollectionItem[]>("/documents/collections", {}, false)
@@ -157,23 +131,10 @@ export default function Admin() {
     }
   };
 
-  // fetch FAQ on tab switch
+  // fetch prompts + FAQ on prompts tab switch
   useEffect(() => {
-    if (activeTab === "faq" && !faqLoaded) {
-      setFaqLoading(true);
-      apiFetch<FaqItem[]>("/admin/faq", {}, true)
-        .then(setFaq)
-        .catch(() => { })
-        .finally(() => {
-          setFaqLoading(false);
-          setFaqLoaded(true);
-        });
-    }
-  }, [activeTab, faqLoaded]);
-
-  // fetch prompts on tab switch
-  useEffect(() => {
-    if (activeTab === "prompts" && !promptsLoaded) {
+    if (activeTab !== "prompts") return;
+    if (!promptsLoaded) {
       setPromptsLoading(true);
       apiFetch<PromptTemplate[]>("/prompts/", {}, false)
         .then(setPrompts)
@@ -183,7 +144,17 @@ export default function Admin() {
           setPromptsLoaded(true);
         });
     }
-  }, [activeTab, promptsLoaded]);
+    if (!faqLoaded) {
+      setFaqLoading(true);
+      apiFetch<FaqItem[]>("/admin/faq", {}, true)
+        .then(setFaq)
+        .catch(() => { })
+        .finally(() => {
+          setFaqLoading(false);
+          setFaqLoaded(true);
+        });
+    }
+  }, [activeTab, promptsLoaded, faqLoaded]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -253,6 +224,41 @@ export default function Admin() {
     }
   };
 
+  const handleGenerateSuggestions = async () => {
+    setGenerating(true);
+    setPromptsError(null);
+    try {
+      const suggestions = await apiFetch<{ title: string; content: string }[]>(
+        "/prompts/generate",
+        { method: "POST" },
+        true,
+      );
+      const created: PromptTemplate[] = [];
+      for (const s of suggestions) {
+        const item = await apiFetch<PromptTemplate>(
+          "/prompts/",
+          {
+            method: "POST",
+            body: JSON.stringify({ title: s.title, content: s.content }),
+          },
+          true,
+        );
+        created.push(item);
+      }
+      setPrompts((prev) => [...prev, ...created]);
+    } catch (e) {
+      setPromptsError((e as Error).message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleUseFaqQuestion = (question: string) => {
+    setNewTitle(question.slice(0, 60));
+    setNewContent(question);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleDeletePrompt = async (id: string) => {
     try {
       await apiFetch(`/prompts/${id}`, { method: "DELETE" }, true);
@@ -265,7 +271,6 @@ export default function Admin() {
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "users", label: "จัดการผู้ใช้งาน", icon: <Users className="w-4 h-4" /> },
     { key: "docs", label: "เอกสาร", icon: <FileText className="w-4 h-4" /> },
-    { key: "faq", label: "FAQ", icon: <HelpCircle className="w-4 h-4" /> },
     { key: "prompts", label: "Prompt Templates", icon: <MessageSquare className="w-4 h-4" /> },
     { key: "varieties", label: "พันธุ์ข้าว", icon: <Sprout className="w-4 h-4" /> },
   ];
@@ -487,9 +492,6 @@ export default function Admin() {
         </div>
       )}
 
-      {/* FAQ Tab */}
-      {activeTab === "faq" && <FaqTab faq={faq} faqLoading={faqLoading} />}
-
       {/* Prompt Templates Tab */}
       {activeTab === "prompts" && (
         <div className="space-y-4">
@@ -513,15 +515,61 @@ export default function Admin() {
             {promptsError && (
               <p className="text-sm text-red-600">{promptsError}</p>
             )}
-            <Button
-              onClick={handleAddPrompt}
-              disabled={!newTitle.trim() || !newContent.trim() || saving}
-              className="bg-primary hover:bg-primary/90 rounded-lg"
-              size="sm"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              {saving ? "กำลังบันทึก..." : "เพิ่ม Template"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={handleAddPrompt}
+                disabled={!newTitle.trim() || !newContent.trim() || saving}
+                className="bg-primary hover:bg-primary/90 rounded-lg"
+                size="sm"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                {saving ? "กำลังบันทึก..." : "เพิ่ม Template"}
+              </Button>
+              <Button
+                onClick={handleGenerateSuggestions}
+                disabled={generating}
+                variant="outline"
+                className="rounded-lg"
+                size="sm"
+              >
+                <Sparkles className="w-4 h-4 mr-1" />
+                {generating ? "กำลังสร้าง..." : "สร้างจาก AI"}
+              </Button>
+            </div>
+          </Card>
+
+          {/* FAQ section (top questions from chat_history) */}
+          <Card className="p-4 rounded-xl space-y-3">
+            <h3 className="font-medium text-sm">
+              คำถามที่ถามบ่อย ({faq.length})
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              คลิกคำถามเพื่อใช้เป็น template ใหม่
+            </p>
+            {faqLoading ? (
+              <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
+            ) : faq.length === 0 ? (
+              <EmptyState message="ยังไม่มีประวัติการสนทนา" />
+            ) : (
+              <div className="divide-y divide-border border border-border rounded-lg overflow-hidden bg-white">
+                {faq.map((item, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleUseFaqQuestion(item.question)}
+                    className="w-full text-left flex items-baseline gap-4 px-5 py-3 hover:bg-accent transition-colors"
+                  >
+                    <span className="text-xs text-muted-foreground w-4 shrink-0">
+                      {i + 1}
+                    </span>
+                    <p className="flex-1 text-sm">{item.question}</p>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {item.count} ครั้ง
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </Card>
 
           {/* List */}

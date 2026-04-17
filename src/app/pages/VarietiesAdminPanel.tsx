@@ -68,10 +68,8 @@ const emptyForm = (): Partial<Variety> => ({
 });
 
 export default function VarietiesAdminPanel({
-  onCountChange,
   onVarietiesMutated,
 }: {
-  onCountChange?: (n: number) => void;
   onVarietiesMutated?: () => void;
 }) {
   const [varieties, setVarieties] = useState<Variety[]>([]);
@@ -86,10 +84,7 @@ export default function VarietiesAdminPanel({
 
   const load = () => {
     apiFetch<Variety[]>("/varieties/", {}, false)
-      .then((data) => {
-        setVarieties(data);
-        onCountChange?.(data.length);
-      })
+      .then(setVarieties)
       .catch(() => {});
   };
 
