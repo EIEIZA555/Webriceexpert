@@ -147,6 +147,9 @@ export default function Plots() {
                     <span>{Math.round(pct)}%</span>
                   </div>
                   <Progress value={pct} className="h-2" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {pct >= 100 ? "เก็บเกี่ยวแล้ว" : `เหลืออีก ${total - days} วันถึงเก็บเกี่ยว`}
+                  </p>
                 </div>
               </div>
             </Card>
