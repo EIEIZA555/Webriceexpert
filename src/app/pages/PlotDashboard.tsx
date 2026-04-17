@@ -63,6 +63,14 @@ export default function PlotDashboard() {
   today.setHours(0, 0, 0, 0);
   const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const todayTasks = activePlot.tasks.filter((t) => t.date === todayISO);
+  const nextDate = todayTasks.length === 0
+    ? activePlot.tasks
+        .filter((t) => !t.isCompleted && t.date > todayISO)
+        .sort((a, b) => a.date.localeCompare(b.date))[0]?.date
+    : undefined;
+  const nextTasks = nextDate
+    ? activePlot.tasks.filter((t) => t.date === nextDate)
+    : [];
 
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto">
@@ -236,9 +244,48 @@ export default function PlotDashboard() {
           </div>
 
           {(taskView === "today" ? todayTasks : activePlot.tasks).length === 0 ? (
-            <p className="text-muted-foreground text-sm py-8 text-center bg-slate-50/50 rounded-xl border border-slate-100 border-dashed">
-              {taskView === "today" ? "ไม่มีงานที่กำหนดไว้วันนี้" : "ไม่มีงานในแผน"}
-            </p>
+            taskView === "today" && nextTasks.length > 0 ? (
+              <div>
+                <p className="text-xs text-muted-foreground mb-2 px-1">
+                  ไม่มีงานวันนี้ — งานถัดไป {formatBE(new Date(`${nextDate}T00:00:00`), "EEE d MMM yyyy", { locale: th })}
+                </p>
+                <div className="space-y-2">
+                  {nextTasks.map((task) => (
+                    <motion.div
+                      key={task.id}
+                      layout
+                      className={`flex items-start gap-4 p-4 rounded-xl border transition-all ${
+                        task.isCompleted
+                          ? "bg-emerald-50/40 border-emerald-100/60 opacity-80"
+                          : "bg-white border-slate-200 shadow-sm hover:border-emerald-300"
+                      }`}
+                    >
+                      <TaskGlyph taskName={task.taskName} className="w-5 h-5 shrink-0 mt-1 text-emerald-700" aria-hidden />
+                      <button
+                        type="button"
+                        onClick={() => toggleTask(activePlot.id, task.id)}
+                        className={`shrink-0 mt-0.5 ${task.isCompleted ? "text-emerald-500 hover:text-emerald-600" : "text-slate-300 hover:text-emerald-500"}`}
+                      >
+                        {task.isCompleted ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-medium ${task.isCompleted ? "line-through text-slate-500" : "text-slate-900"}`}>
+                          {task.taskName}
+                        </p>
+                        <p className="text-sm mt-0.5 text-slate-500">{task.stage}</p>
+                        {task.description && (
+                          <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{task.description}</p>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm py-8 text-center bg-slate-50/50 rounded-xl border border-slate-100 border-dashed">
+                {taskView === "today" ? "ไม่มีงานที่กำหนดไว้และยังไม่มีงานถัดไป" : "ไม่มีงานในแผน"}
+              </p>
+            )
           ) : (
             <div className={`space-y-2 ${taskView === "all" ? "max-h-[500px] overflow-y-auto pr-2 [scrollbar-gutter:stable]" : ""}`}>
               {(taskView === "today" ? todayTasks : activePlot.tasks).map((task) => {

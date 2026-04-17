@@ -265,7 +265,7 @@ export default function CreatePlan() {
                         if (date < new Date(new Date().setHours(0,0,0,0))) return true;
                         if (selectedVariety?.is_photoperiod_sensitive) {
                           const m = date.getMonth() + 1; // 1-12
-                          return m < 5 || m > 8;
+                          return m < 7 || m > 8;
                         }
                         return false;
                       }}
@@ -299,9 +299,7 @@ export default function CreatePlan() {
                     <div>
                       <h4 className="text-sm font-medium text-[#ff8f00]">พันธุ์ข้าวไวแสง (Photosensitive)</h4>
                       <p className="text-xs text-[#ffb300] mt-1 leading-relaxed">
-                        ข้าวพันธุ์นี้จะออกดอกตามช่วงแสงของฤดูกาล
-                        <br />
-                        <span className="font-semibold text-[#ff8f00]">คำแนะนำ:</span> ควรเริ่มเตรียมงานปลูกในช่วง <span className="underline">พฤษภาคม - สิงหาคม</span>
+                        ข้าวพันธุ์นี้ออกดอกตามช่วงแสง เหมาะกับการปลูกช่วงต้นฤดูฝน
                       </p>
                     </div>
                   </div>
