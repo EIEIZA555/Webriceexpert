@@ -38,9 +38,9 @@ export function AppLayout() {
 
   return (
       <PlansProvider>
-    <div className="h-screen bg-gray-50 flex overflow-hidden">
+    <div className="h-screen bg-gray-50 flex overflow-hidden print:h-auto print:overflow-visible print:block print:bg-white">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-border hidden lg:flex flex-col">
+      <aside className="w-64 bg-white border-r border-border hidden lg:flex flex-col print:hidden">
         <div className="p-6 border-b border-border">
           <button
             onClick={() => navigate("/app/plots")}
@@ -102,7 +102,7 @@ export function AppLayout() {
       </aside>
 
       {/* Mobile Header */}
-      <div className="lg:hidden sticky top-0 z-40 bg-white border-b border-border flex items-center justify-between px-4 py-3">
+      <div className="lg:hidden sticky top-0 z-40 bg-white border-b border-border flex items-center justify-between px-4 py-3 print:hidden">
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className="p-2 rounded-lg hover:bg-accent"
@@ -123,13 +123,13 @@ export function AppLayout() {
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div
-          className="lg:hidden fixed inset-0 z-50 bg-black/50"
+          className="lg:hidden fixed inset-0 z-50 bg-black/50 print:hidden"
           onClick={() => setMobileMenuOpen(false)}
           aria-hidden
         />
       )}
       <div
-        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r shadow-xl transition-transform duration-200 flex flex-col ${
+        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r shadow-xl transition-transform duration-200 flex flex-col print:hidden ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -198,10 +198,12 @@ export function AppLayout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto print:overflow-visible">
         <Outlet />
       </main>
-      <FloatingChat />
+      <div className="print:hidden">
+        <FloatingChat />
+      </div>
     </div>
       </PlansProvider>
   );

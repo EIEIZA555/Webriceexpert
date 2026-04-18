@@ -8,6 +8,7 @@ import {
   Sparkles,
   Sprout,
   Users,
+  AlertTriangle,
 } from "lucide-react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -23,7 +24,7 @@ import VarietiesAdminPanel from "./VarietiesAdminPanel";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 
-type Tab = "users" | "docs" | "prompts" | "varieties";
+type Tab = "users" | "docs" | "prompts" | "varieties" | "gaps";
 
 interface UserResponse {
   id: string;
@@ -34,6 +35,12 @@ interface UserResponse {
 interface FaqItem {
   question: string;
   count: number;
+}
+
+interface GapItem {
+  question: string;
+  count: number;
+  last_asked_at: string | null;
 }
 
 interface PromptTemplate {
@@ -76,6 +83,11 @@ export default function Admin() {
   const [promptsError, setPromptsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+
+  // --- Gaps state ---
+  const [gaps, setGaps] = useState<GapItem[]>([]);
+  const [gapsLoading, setGapsLoading] = useState(false);
+  const [gapsLoaded, setGapsLoaded] = useState(false);
 
   const refreshDocumentCollections = useCallback(() => {
     apiFetch<CollectionItem[]>("/documents/collections", {}, false)
@@ -130,6 +142,20 @@ export default function Admin() {
       alert((e as Error).message);
     }
   };
+
+  // fetch knowledge gaps on gaps tab switch
+  useEffect(() => {
+    if (activeTab === "gaps" && !gapsLoaded) {
+      setGapsLoading(true);
+      apiFetch<GapItem[]>("/admin/gaps", {}, true)
+        .then(setGaps)
+        .catch(() => {})
+        .finally(() => {
+          setGapsLoading(false);
+          setGapsLoaded(true);
+        });
+    }
+  }, [activeTab, gapsLoaded]);
 
   // fetch prompts + FAQ on prompts tab switch
   useEffect(() => {
@@ -273,6 +299,7 @@ export default function Admin() {
     { key: "docs", label: "เอกสาร", icon: <FileText className="w-4 h-4" /> },
     { key: "prompts", label: "Prompt Templates", icon: <MessageSquare className="w-4 h-4" /> },
     { key: "varieties", label: "พันธุ์ข้าว", icon: <Sprout className="w-4 h-4" /> },
+    { key: "gaps", label: "ช่องว่างความรู้", icon: <AlertTriangle className="w-4 h-4" /> },
   ];
 
   return (
@@ -620,6 +647,54 @@ export default function Admin() {
         <VarietiesAdminPanel
           onVarietiesMutated={refreshDocumentCollections}
         />
+      )}
+
+      {activeTab === "gaps" && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-medium">คำถามที่ AI ตอบไม่ได้ ({gaps.length})</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              คำถามที่ไม่มีเอกสารตรง หรือ AI ตอบว่า "ไม่ทราบ" —
+              ใช้เป็นแนวทางว่าควรอัพโหลดเอกสารเรื่องอะไรเพิ่ม
+            </p>
+          </div>
+          {gapsLoading ? (
+            <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
+          ) : gaps.length === 0 ? (
+            <EmptyState message="ยังไม่มีช่องว่างความรู้ — AI ตอบได้ครบทุกคำถาม 🎉" />
+          ) : (
+            <Card className="rounded-xl overflow-hidden shadow-sm border-slate-200">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
+                    <tr>
+                      <th className="px-6 py-4 font-medium w-10">#</th>
+                      <th className="px-6 py-4 font-medium">คำถาม</th>
+                      <th className="px-6 py-4 font-medium w-28 text-center">จำนวนครั้ง</th>
+                      <th className="px-6 py-4 font-medium w-40">ถามล่าสุด</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {gaps.map((item, i) => (
+                      <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4 text-muted-foreground">{i + 1}</td>
+                        <td className="px-6 py-4 text-slate-900">{item.question}</td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
+                            {item.count}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-muted-foreground text-xs">
+                          {item.last_asked_at?.slice(0, 10) ?? "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+        </div>
       )}
     </div>
   );

@@ -11,6 +11,7 @@ import {
   MapPin,
   Pencil,
   Copy,
+  Printer,
 } from "lucide-react";
 import { usePlans } from "../contexts/PlansContext";
 import { motion } from "motion/react";
@@ -124,7 +125,18 @@ export default function PlotDashboard() {
             </div>
           </div>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2 shrink-0 print:hidden">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setTaskView("all");
+              setTimeout(() => window.print(), 150);
+            }}
+            className="rounded-xl h-11 px-4"
+          >
+            <Printer className="w-4 h-4 mr-2" />
+            พิมพ์
+          </Button>
           <Button
             variant="outline"
             onClick={() => {
@@ -419,7 +431,7 @@ export default function PlotDashboard() {
               </div>
             </div>
 
-            <div className="flex bg-slate-100/80 p-1 rounded-xl shrink-0">
+            <div className="flex bg-slate-100/80 p-1 rounded-xl shrink-0 print:hidden">
               <button
                 onClick={() => setTaskView("today")}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -487,7 +499,7 @@ export default function PlotDashboard() {
               </p>
             )
           ) : (
-            <div className={`space-y-2 ${taskView === "all" ? "max-h-[500px] overflow-y-auto pr-2 [scrollbar-gutter:stable]" : ""}`}>
+            <div className={`space-y-2 ${taskView === "all" ? "max-h-[500px] overflow-y-auto pr-2 [scrollbar-gutter:stable] print:max-h-none print:overflow-visible print:pr-0" : ""}`}>
               {(taskView === "today" ? todayTasks : activePlot.tasks).map((task) => {
                 const isOverdue = !task.isCompleted && new Date(`${task.date}T00:00:00`) < today;
                 
