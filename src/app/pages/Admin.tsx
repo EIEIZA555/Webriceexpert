@@ -15,10 +15,12 @@ import { Button } from "../components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from "../components/ui/dialog";
+import { Checkbox } from "../components/ui/checkbox";
 import { apiFetch, API_BASE_URL, getAuthToken, fetchDocsAndCollections, type DocumentResponse, type CollectionItem } from "../lib/api";
 import VarietiesAdminPanel from "./VarietiesAdminPanel";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog";
@@ -48,6 +50,11 @@ interface PromptTemplate {
   title: string;
   content: string;
   created_at: string;
+}
+
+interface PromptSuggestion {
+  title: string;
+  content: string;
 }
 
 export default function Admin() {
@@ -83,6 +90,10 @@ export default function Admin() {
   const [promptsError, setPromptsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [generatedSuggestions, setGeneratedSuggestions] = useState<PromptSuggestion[]>([]);
+  const [selectedSuggestions, setSelectedSuggestions] = useState<Set<number>>(new Set());
+  const [suggestionsDialogOpen, setSuggestionsDialogOpen] = useState(false);
+  const [savingGenerated, setSavingGenerated] = useState(false);
 
   // --- Gaps state ---
   const [gaps, setGaps] = useState<GapItem[]>([]);
@@ -254,13 +265,45 @@ export default function Admin() {
     setGenerating(true);
     setPromptsError(null);
     try {
-      const suggestions = await apiFetch<{ title: string; content: string }[]>(
+      const suggestions = await apiFetch<PromptSuggestion[]>(
         "/prompts/generate",
         { method: "POST" },
         true,
       );
+      if (suggestions.length === 0) {
+        throw new Error("AI ไม่ได้สร้างคำถามกลับมา กรุณาลองใหม่อีกครั้ง");
+      }
+      setGeneratedSuggestions(suggestions);
+      setSelectedSuggestions(new Set(suggestions.map((_, index) => index)));
+      setSuggestionsDialogOpen(true);
+    } catch (e) {
+      setPromptsError((e as Error).message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const toggleGeneratedSuggestion = (index: number) => {
+    setSelectedSuggestions((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
+
+  const handleSaveGeneratedSuggestions = async () => {
+    const selected = generatedSuggestions.filter((_, index) => selectedSuggestions.has(index));
+    if (selected.length === 0) return;
+
+    setSavingGenerated(true);
+    setPromptsError(null);
+    try {
       const created: PromptTemplate[] = [];
-      for (const s of suggestions) {
+      for (const s of selected) {
         const item = await apiFetch<PromptTemplate>(
           "/prompts/",
           {
@@ -272,10 +315,13 @@ export default function Admin() {
         created.push(item);
       }
       setPrompts((prev) => [...prev, ...created]);
+      setGeneratedSuggestions([]);
+      setSelectedSuggestions(new Set());
+      setSuggestionsDialogOpen(false);
     } catch (e) {
       setPromptsError((e as Error).message);
     } finally {
-      setGenerating(false);
+      setSavingGenerated(false);
     }
   };
 
@@ -564,6 +610,81 @@ export default function Admin() {
               </Button>
             </div>
           </Card>
+
+          <Dialog
+            open={suggestionsDialogOpen}
+            onOpenChange={(open) => {
+              if (!savingGenerated) setSuggestionsDialogOpen(open);
+            }}
+          >
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>เลือกคำถามจาก AI ก่อนบันทึก</DialogTitle>
+                <DialogDescription>
+                  คำถามชุดนี้สร้างจากเอกสารใน ChromaDB ทุก collection ที่ backend โหลดไว้ เช่น general และ collection ของพันธุ์ข้าว
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="max-h-[55vh] overflow-y-auto space-y-3 pr-1">
+                {generatedSuggestions.map((suggestion, index) => {
+                  const checked = selectedSuggestions.has(index);
+                  return (
+                    <div
+                      key={`${suggestion.title}-${index}`}
+                      onClick={() => toggleGeneratedSuggestion(index)}
+                      className={`w-full text-left rounded-lg border p-4 transition-colors ${
+                        checked
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-white hover:bg-accent"
+                      }`}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          toggleGeneratedSuggestion(index);
+                        }
+                      }}
+                    >
+                      <div className="flex gap-3">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={() => toggleGeneratedSuggestion(index)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-0.5"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">{suggestion.title}</p>
+                          <p className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">
+                            {suggestion.content}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setSuggestionsDialogOpen(false)}
+                  disabled={savingGenerated}
+                >
+                  ยกเลิก
+                </Button>
+                <Button
+                  className="bg-primary hover:bg-primary/90"
+                  onClick={handleSaveGeneratedSuggestions}
+                  disabled={savingGenerated || selectedSuggestions.size === 0}
+                >
+                  {savingGenerated
+                    ? "กำลังบันทึก..."
+                    : `บันทึก ${selectedSuggestions.size} Template`}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* FAQ section (top questions from chat_history) */}
           <Card className="p-4 rounded-xl space-y-3">

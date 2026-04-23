@@ -153,6 +153,26 @@ export default function VarietiesAdminPanel({
     if (form.heading_day == null)
       errors.heading_day = "กรุณากรอกวันตั้งท้องและออกรวง";
 
+    if (
+      form.harvest_age_days != null &&
+      form.tillering_day != null &&
+      form.panicle_initiation_day != null &&
+      form.heading_day != null &&
+      !(
+        0 <= Number(form.tillering_day) &&
+        Number(form.tillering_day) < Number(form.panicle_initiation_day) &&
+        Number(form.panicle_initiation_day) < Number(form.heading_day) &&
+        Number(form.heading_day) < Number(form.harvest_age_days)
+      )
+    ) {
+      errors.harvest_age_days =
+        "ลำดับวันต้องเป็น แตกกอ < กำเนิดช่อดอก < ออกรวง < อายุเก็บเกี่ยว";
+      errors.tillering_day = errors.tillering_day ?? "ตรวจสอบลำดับวัน";
+      errors.panicle_initiation_day =
+        errors.panicle_initiation_day ?? "ตรวจสอบลำดับวัน";
+      errors.heading_day = errors.heading_day ?? "ตรวจสอบลำดับวัน";
+    }
+
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       const first = FIELD_ORDER.find((k) => errors[k]);
@@ -450,6 +470,11 @@ export default function VarietiesAdminPanel({
               <p className="text-sm font-medium mb-3">
                 ระยะการเจริญเติบโต (วันนับจากวันปลูก)
               </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                ระบบใช้วันแตกกอสำหรับคำนวณปุ๋ยครั้งที่ 1, วันกำเนิดช่อดอกสำหรับปุ๋ยครั้งที่ 2
+                วันตั้งท้อง/ออกรวงสำหรับช่วงออกรวง และอายุเก็บเกี่ยวสำหรับคำนวณวันเก็บเกี่ยว
+                โดยทุกค่าต้องเรียงลำดับก่อนหลังตามระยะจริง
+              </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-xs">อายุเก็บเกี่ยว (วัน)</Label>
@@ -511,6 +536,10 @@ export default function VarietiesAdminPanel({
             {/* ปุ๋ย */}
             <div className="border-t pt-4 space-y-4">
               <p className="text-sm font-medium">ปุ๋ย</p>
+              <p className="text-xs text-muted-foreground">
+                กรอกอัตราเป็นกิโลกรัมต่อไร่ ระบบจะคำนวณปริมาณรวมตามพื้นที่และชนิดดิน
+                โดยสูตรปุ๋ยครั้งที่ 1 ในแผนจะเลือกจากชนิดดิน ส่วนสูตรปุ๋ยครั้งที่ 2 ใช้ค่าที่กรอกในหน้านี้
+              </p>
 
               {/* ปุ๋ยครั้งที่ 1 */}
               <div className="bg-slate-50 rounded-xl p-4 space-y-3">
