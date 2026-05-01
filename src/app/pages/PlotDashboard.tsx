@@ -275,7 +275,7 @@ export default function PlotDashboard() {
               />
               {activePlot.isPhotoperiodSensitive && (
                 <p className="text-xs text-amber-600">
-                  ข้าวไวแสง — ต้องเริ่มในเดือน ก.ค. หรือ ส.ค.
+                  ข้าวไวแสง — ต้องเริ่มในเดือน มิ.ย. หรือ ก.ค.
                 </p>
               )}
             </div>
@@ -396,12 +396,12 @@ export default function PlotDashboard() {
               </div>
               <div className="bg-amber-50 rounded-xl p-4 text-center">
                 <p className="text-2xl font-bold text-amber-700">{activePlot.resources.fertilizer1Kg}</p>
-                <p className="text-xs text-muted-foreground mt-1">ปุ๋ยครั้งที่ 1 (กก.)</p>
+                <p className="text-xs text-muted-foreground mt-1">ปุ๋ยช่วงแตกกอ (กก.)</p>
                 <p className="text-xs font-mono text-amber-600 mt-0.5">{activePlot.resources.fertilizer1Formula}</p>
               </div>
               <div className="bg-amber-50 rounded-xl p-4 text-center">
                 <p className="text-2xl font-bold text-amber-700">{activePlot.resources.fertilizer2Kg}</p>
-                <p className="text-xs text-muted-foreground mt-1">ปุ๋ยครั้งที่ 2 (กก.)</p>
+                <p className="text-xs text-muted-foreground mt-1">ปุ๋ยช่วงกำเนิดช่อดอก (กก.)</p>
                 <p className="text-xs font-mono text-amber-600 mt-0.5">{activePlot.resources.fertilizer2Formula}</p>
               </div>
               {activePlot.resources.seedlingTrays != null && (
@@ -564,4 +564,3 @@ export default function PlotDashboard() {
     </div>
   );
 }
-

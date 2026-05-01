@@ -66,18 +66,18 @@ rice-expert-app/
 ├── src/
 │   ├── app/
 │   │   ├── components/
-│   │   │   ├── figma/           # Figma components
 │   │   │   └── ui/              # shadcn/ui components
 │   │   ├── pages/
 │   │   │   ├── Login.tsx        # หน้า Login
-│   │   │   ├── Dashboard.tsx    # หน้า Dashboard
+│   │   │   ├── Plots.tsx        # หน้าแสดงรายการแปลง
+│   │   │   ├── PlotDashboard.tsx # หน้า Dashboard รายแปลง
 │   │   │   └── CreatePlan.tsx   # หน้า Create Plan
 │   │   ├── App.tsx              # Main app component
-│   │   └── routes.ts            # Router configuration
+│   │   └── routes.tsx           # Router configuration
 │   └── styles/
 │       ├── theme.css            # Design tokens และ CSS variables
 │       ├── tailwind.css         # Tailwind directives
-│       └── fonts.css            # Font imports
+│       └── index.css            # Style entrypoint
 ├── package.json
 ├── vite.config.ts
 └── README.md

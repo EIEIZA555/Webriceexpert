@@ -31,7 +31,6 @@ interface Variety {
   heading_day: number | null;
   fert1_rate: number | null;
   fert2_rate: number | null;
-  fert1_formula: string | null;
   fert2_formula: string | null;
   fert1_note: string | null;
   fert2_note: string | null;
@@ -46,6 +45,9 @@ const FIELD_ORDER = [
   "tillering_day",
   "panicle_initiation_day",
   "heading_day",
+  "fert1_rate",
+  "fert2_rate",
+  "fert2_formula",
 ];
 
 const emptyForm = (): Partial<Variety> => ({
@@ -61,7 +63,6 @@ const emptyForm = (): Partial<Variety> => ({
   heading_day: undefined,
   fert1_rate: undefined,
   fert2_rate: undefined,
-  fert1_formula: "",
   fert2_formula: "",
   fert1_note: "",
   fert2_note: "",
@@ -152,6 +153,20 @@ export default function VarietiesAdminPanel({
       errors.panicle_initiation_day = "กรุณากรอกวันกำเนิดช่อดอก";
     if (form.heading_day == null)
       errors.heading_day = "กรุณากรอกวันตั้งท้องและออกรวง";
+    if (
+      form.fert1_rate == null ||
+      !Number.isFinite(Number(form.fert1_rate)) ||
+      Number(form.fert1_rate) < 0
+    )
+      errors.fert1_rate = "กรุณากรอกอัตราปุ๋ยช่วงแตกกอ";
+    if (
+      form.fert2_rate == null ||
+      !Number.isFinite(Number(form.fert2_rate)) ||
+      Number(form.fert2_rate) < 0
+    )
+      errors.fert2_rate = "กรุณากรอกอัตราปุ๋ยช่วงกำเนิดช่อดอก";
+    if (!form.fert2_formula?.trim())
+      errors.fert2_formula = "กรุณากรอกสูตรปุ๋ยช่วงกำเนิดช่อดอก";
 
     if (
       form.harvest_age_days != null &&
@@ -197,8 +212,7 @@ export default function VarietiesAdminPanel({
         heading_day: form.heading_day ?? null,
         fert1_rate: form.fert1_rate ?? null,
         fert2_rate: form.fert2_rate ?? null,
-        fert1_formula: form.fert1_formula || null,
-        fert2_formula: form.fert2_formula || null,
+        fert2_formula: form.fert2_formula?.trim() || null,
         fert1_note: form.fert1_note || null,
         fert2_note: form.fert2_note || null,
       };
@@ -328,7 +342,7 @@ export default function VarietiesAdminPanel({
             )}
             {(v.fert1_rate || v.fert2_rate) && (
               <p className="text-xs text-muted-foreground mb-3">
-                ปุ๋ย 1: {v.fert1_rate ?? "-"} กก./ไร่ • ปุ๋ย 2:{" "}
+                แตกกอ: {v.fert1_rate ?? "-"} กก./ไร่ • กำเนิดช่อดอก:{" "}
                 {v.fert2_rate ?? "-"} กก./ไร่
               </p>
             )}
@@ -471,7 +485,7 @@ export default function VarietiesAdminPanel({
                 ระยะการเจริญเติบโต (วันนับจากวันปลูก)
               </p>
               <p className="text-xs text-muted-foreground mb-3">
-                ระบบใช้วันแตกกอสำหรับคำนวณปุ๋ยครั้งที่ 1, วันกำเนิดช่อดอกสำหรับปุ๋ยครั้งที่ 2
+                ระบบใช้วันแตกกอสำหรับคำนวณปุ๋ยช่วงแตกกอ, วันกำเนิดช่อดอกสำหรับปุ๋ยช่วงกำเนิดช่อดอก
                 วันตั้งท้อง/ออกรวงสำหรับช่วงออกรวง และอายุเก็บเกี่ยวสำหรับคำนวณวันเก็บเกี่ยว
                 โดยทุกค่าต้องเรียงลำดับก่อนหลังตามระยะจริง
               </p>
@@ -538,39 +552,33 @@ export default function VarietiesAdminPanel({
               <p className="text-sm font-medium">ปุ๋ย</p>
               <p className="text-xs text-muted-foreground">
                 กรอกอัตราเป็นกิโลกรัมต่อไร่ ระบบจะคำนวณปริมาณรวมตามพื้นที่และชนิดดิน
-                โดยสูตรปุ๋ยครั้งที่ 1 ในแผนจะเลือกจากชนิดดิน ส่วนสูตรปุ๋ยครั้งที่ 2 ใช้ค่าที่กรอกในหน้านี้
+                โดยสูตรปุ๋ยช่วงแตกกอจะเลือกจากชนิดดิน ส่วนสูตรปุ๋ยช่วงกำเนิดช่อดอกใช้ค่าที่กรอกในหน้านี้
               </p>
 
-              {/* ปุ๋ยครั้งที่ 1 */}
+              {/* ปุ๋ยช่วงแตกกอ */}
               <div className="bg-slate-50 rounded-xl p-4 space-y-3">
                 <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                  ปุ๋ยครั้งที่ 1
+                  ปุ๋ยช่วงแตกกอ
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs">อัตรา (กก./ไร่)</Label>
                     <Input
+                      data-field="fert1_rate"
                       type="number"
                       min={0}
-                      className="mt-1 rounded-lg bg-white"
+                      className={`mt-1 rounded-lg bg-white ${errClass("fert1_rate")}`}
                       placeholder="เช่น 30"
                       value={num(form.fert1_rate)}
                       onChange={(e) => setNum("fert1_rate", e.target.value)}
                     />
+                    <FieldError field="fert1_rate" />
                   </div>
                   <div>
-                    <Label className="text-xs">สูตรปุ๋ย</Label>
-                    <Input
-                      className="mt-1 rounded-lg bg-white"
-                      placeholder="16-20-0"
-                      value={form.fert1_formula ?? ""}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          fert1_formula: e.target.value,
-                        }))
-                      }
-                    />
+                    <Label className="text-xs">สูตรปุ๋ยอัตโนมัติตามดิน</Label>
+                    <div className="mt-1 rounded-lg bg-white border border-slate-200 px-3 py-2 text-xs text-slate-600 leading-relaxed">
+                      ดินเหนียว: 16-20-0 · ดินร่วน/ดินทราย: 16-16-8
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -586,36 +594,41 @@ export default function VarietiesAdminPanel({
                 </div>
               </div>
 
-              {/* ปุ๋ยครั้งที่ 2 */}
+              {/* ปุ๋ยช่วงกำเนิดช่อดอก */}
               <div className="bg-slate-50 rounded-xl p-4 space-y-3">
                 <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                  ปุ๋ยครั้งที่ 2
+                  ปุ๋ยช่วงกำเนิดช่อดอก
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs">อัตรา (กก./ไร่)</Label>
                     <Input
+                      data-field="fert2_rate"
                       type="number"
                       min={0}
-                      className="mt-1 rounded-lg bg-white"
+                      className={`mt-1 rounded-lg bg-white ${errClass("fert2_rate")}`}
                       placeholder="เช่น 12"
                       value={num(form.fert2_rate)}
                       onChange={(e) => setNum("fert2_rate", e.target.value)}
                     />
+                    <FieldError field="fert2_rate" />
                   </div>
                   <div>
                     <Label className="text-xs">สูตรปุ๋ย</Label>
                     <Input
-                      className="mt-1 rounded-lg bg-white"
+                      data-field="fert2_formula"
+                      className={`mt-1 rounded-lg bg-white ${errClass("fert2_formula")}`}
                       placeholder="46-0-0"
                       value={form.fert2_formula ?? ""}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setForm((f) => ({
                           ...f,
                           fert2_formula: e.target.value,
-                        }))
-                      }
+                        }));
+                        clearFieldError("fert2_formula");
+                      }}
                     />
+                    <FieldError field="fert2_formula" />
                   </div>
                 </div>
                 <div>

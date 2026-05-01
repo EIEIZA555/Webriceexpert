@@ -73,7 +73,6 @@ export default function Admin() {
   const [docsError, setDocsError] = useState<string | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState("general");
-  const [pendingFiles, setPendingFiles] = useState<FileList | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- FAQ state ---

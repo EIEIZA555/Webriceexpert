@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { format } from "date-fns";
 import { formatBE } from "../lib/dateUtils";
 import { th } from "date-fns/locale";
 import { Card } from "../components/ui/card";
@@ -265,7 +264,7 @@ export default function CreatePlan() {
                         if (date < new Date(new Date().setHours(0,0,0,0))) return true;
                         if (selectedVariety?.is_photoperiod_sensitive) {
                           const m = date.getMonth() + 1; // 1-12
-                          return m < 7 || m > 8;
+                          return m < 6 || m > 7;
                         }
                         return false;
                       }}

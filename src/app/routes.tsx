@@ -55,7 +55,11 @@ export const router = createBrowserRouter([
       },
       {
         path: "admin",
-        element: <Admin />,
+        element: (
+          <ProtectedRoute requireAdmin>
+            <Admin />
+          </ProtectedRoute>
+        ),
       },
       {
         path: "create-plan",
