@@ -6,12 +6,11 @@ import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Calendar } from "../components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
-import { ArrowLeft, CalendarIcon, Check, Leaf, Search } from "lucide-react";
+import { ArrowLeft, Check, Leaf, Search } from "lucide-react";
 import { usePlans } from "../contexts/PlansContext";
 import { PLANTING_METHODS, type PlantingMethodKey } from "../lib/plantingMethod";
 import { apiFetch } from "../lib/api";
+import { PlanStartDatePicker } from "../components/PlanStartDatePicker";
 
 export default function CreatePlan() {
   const navigate = useNavigate();
@@ -247,47 +246,20 @@ export default function CreatePlan() {
                 <Label htmlFor="plantDate" className="mb-2 block">
                   วันที่เริ่มเตรียมงาน
                 </Label>
-                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                  <PopoverTrigger className="flex w-full h-12 rounded-lg items-center px-3 text-left text-sm bg-input-background border border-border gap-2 hover:bg-accent transition-colors">
-                    <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                    {formData.plantDate ? (
-                      <span>{formatBE(new Date(`${formData.plantDate}T00:00:00`), "d MMMM yyyy", { locale: th })}</span>
-                    ) : (
-                      <span className="text-muted-foreground">เลือกวันที่</span>
-                    )}
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={formData.plantDate ? new Date(`${formData.plantDate}T00:00:00`) : undefined}
-                      disabled={(date) => {
-                        if (date < new Date(new Date().setHours(0,0,0,0))) return true;
-                        if (selectedVariety?.is_photoperiod_sensitive) {
-                          const m = date.getMonth() + 1; // 1-12
-                          return m < 6 || m > 7;
-                        }
-                        return false;
-                      }}
-                      onSelect={(date) => {
-                        if (date) {
-                          const yyyy = date.getFullYear();
-                          const mm = String(date.getMonth() + 1).padStart(2, "0");
-                          const dd = String(date.getDate()).padStart(2, "0");
-                          setFormData({ ...formData, plantDate: `${yyyy}-${mm}-${dd}` });
-                        }
-                        setCalendarOpen(false);
-                      }}
-                      formatters={{
-                        formatCaption: (date) => {
-                          const months = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
-                          return `${months[date.getMonth()]} ${date.getFullYear() + 543}`;
-                        },
-                      }}
-                      locale={th}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <PlanStartDatePicker
+                  value={formData.plantDate}
+                  onChange={(plantDate) => setFormData({ ...formData, plantDate })}
+                  open={calendarOpen}
+                  onOpenChange={setCalendarOpen}
+                  disabled={(date) => {
+                    if (date < new Date(new Date().setHours(0, 0, 0, 0))) return true;
+                    if (selectedVariety?.is_photoperiod_sensitive) {
+                      const m = date.getMonth() + 1;
+                      return m < 6 || m > 7;
+                    }
+                    return false;
+                  }}
+                />
                 <p className="text-sm text-muted-foreground mt-2">
                   ระบบจะคำนวณวันลงปลูกจริงและการดูแลต่างๆ ให้สัมพันธ์กับวันที่คุณเริ่มเตรียมงาน
                 </p>

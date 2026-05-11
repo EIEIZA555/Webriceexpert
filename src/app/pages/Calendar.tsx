@@ -57,7 +57,7 @@ export default function Calendar() {
   }, [] as { name: string; startDay: number; endDay: number }[]);
 
   const selectedKey = selectedDay != null ? format(selectedDay, "yyyy-MM-dd") : undefined;
-  const tasksForSelected = (selectedKey && tasksByDate.get(selectedKey)) ?? [];
+  const tasksForSelected: PlanTask[] = selectedKey ? (tasksByDate.get(selectedKey) ?? []) : [];
 
   return (
     <div className="p-6 lg:p-10 max-w-5xl mx-auto">

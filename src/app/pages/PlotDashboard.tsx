@@ -31,6 +31,7 @@ import {
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import type { SoilTypeKey } from "../lib/planTypes";
+import { PlanStartDatePicker } from "../components/PlanStartDatePicker";
 
 export default function PlotDashboard() {
   const { id } = useParams();
@@ -61,6 +62,7 @@ export default function PlotDashboard() {
   const [clonePlotName, setClonePlotName] = useState("");
   const [cloneSaving, setCloneSaving] = useState(false);
   const [cloneError, setCloneError] = useState<string | null>(null);
+  const [cloneCalendarOpen, setCloneCalendarOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -267,11 +269,19 @@ export default function PlotDashboard() {
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label htmlFor="clone-start-date">วันเริ่ม (Day 0)</Label>
-              <Input
-                id="clone-start-date"
-                type="date"
+              <PlanStartDatePicker
                 value={cloneStartDate}
-                onChange={(e) => setCloneStartDate(e.target.value)}
+                onChange={setCloneStartDate}
+                open={cloneCalendarOpen}
+                onOpenChange={setCloneCalendarOpen}
+                disabled={(date) => {
+                  if (date < new Date(new Date().setHours(0, 0, 0, 0))) return true;
+                  if (activePlot.isPhotoperiodSensitive) {
+                    const m = date.getMonth() + 1;
+                    return m < 6 || m > 7;
+                  }
+                  return false;
+                }}
               />
               {activePlot.isPhotoperiodSensitive && (
                 <p className="text-xs text-amber-600">

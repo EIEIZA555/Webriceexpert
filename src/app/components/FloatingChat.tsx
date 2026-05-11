@@ -1,5 +1,11 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Sprout, SendHorizonal, FlaskConical } from "lucide-react";
+import {
+  MessageCircle,
+  X,
+  Sprout,
+  SendHorizonal,
+  FlaskConical,
+} from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { isAuthenticated } from "../lib/auth";
 import { usePlans } from "../contexts/PlansContext";
@@ -55,7 +61,8 @@ function toDisplayUserQuestion(storedQuestion: string): string {
 }
 
 export function FloatingChat() {
-  const { plan, getDaysSinceStart, getCurrentStageName, getUpcomingTasks } = usePlans();
+  const { plan, getDaysSinceStart, getCurrentStageName, getUpcomingTasks } =
+    usePlans();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [inputMessage, setInputMessage] = useState("");
@@ -75,7 +82,9 @@ export function FloatingChat() {
   const handleHeaderTripleClick = () => {
     headerClickCount.current += 1;
     if (headerClickTimer.current) clearTimeout(headerClickTimer.current);
-    headerClickTimer.current = setTimeout(() => { headerClickCount.current = 0; }, 600);
+    headerClickTimer.current = setTimeout(() => {
+      headerClickCount.current = 0;
+    }, 600);
     if (headerClickCount.current >= 3) {
       headerClickCount.current = 0;
       setNoRagMode((prev) => !prev);
@@ -95,23 +104,30 @@ export function FloatingChat() {
   useEffect(() => {
     if (!isOpen || historyLoaded || !isAuthenticated()) return;
     setHistoryLoaded(true);
-    apiFetch<HistoryItem[]>("/chat/history", {}, true).then((history) => {
-      if (history.length === 0) return;
-      const loaded: ChatMessage[] = [WELCOME_MESSAGE];
-      history.forEach((h, i) => {
-        const displayQ = toDisplayUserQuestion(h.question);
-        const hasPack = h.question.includes("---CONTEXT_PACK");
-        loaded.push({
-          id: i * 2 + 1,
-          text: displayQ,
-          sender: "user",
-          timestamp: new Date(h.created_at),
-          ...(hasPack ? { apiPayload: h.question } : {}),
+    apiFetch<HistoryItem[]>("/chat/history", {}, true)
+      .then((history) => {
+        if (history.length === 0) return;
+        const loaded: ChatMessage[] = [WELCOME_MESSAGE];
+        history.forEach((h, i) => {
+          const displayQ = toDisplayUserQuestion(h.question);
+          const hasPack = h.question.includes("---CONTEXT_PACK");
+          loaded.push({
+            id: i * 2 + 1,
+            text: displayQ,
+            sender: "user",
+            timestamp: new Date(h.created_at),
+            ...(hasPack ? { apiPayload: h.question } : {}),
+          });
+          loaded.push({
+            id: i * 2 + 2,
+            text: h.answer,
+            sender: "bot",
+            timestamp: new Date(h.created_at),
+          });
         });
-        loaded.push({ id: i * 2 + 2, text: h.answer, sender: "bot", timestamp: new Date(h.created_at) });
-      });
-      setMessages(loaded);
-    }).catch(() => {});
+        setMessages(loaded);
+      })
+      .catch(() => {});
   }, [isOpen, historyLoaded]);
 
   const handleSend = async () => {
@@ -125,20 +141,31 @@ export function FloatingChat() {
       const today = new Date().toISOString().slice(0, 10);
 
       // งานที่กำลังทำอยู่วันนี้
-      const todayTasks = plan.tasks.filter(t => t.date.slice(0, 10) === today);
-      const todayText = todayTasks.length > 0
-        ? todayTasks.map(t => `- ${t.taskName}: ${t.description}`).join("\n")
-        : "ไม่มีงานวันนี้";
+      const todayTasks = plan.tasks.filter(
+        (t) => t.date.slice(0, 10) === today,
+      );
+      const todayText =
+        todayTasks.length > 0
+          ? todayTasks
+              .map((t) => `- ${t.taskName}: ${t.description}`)
+              .join("\n")
+          : "ไม่มีงานวันนี้";
 
       // งานถัดไป 7 วัน (ไม่รวมวันนี้)
-      const upcomingTasks = getUpcomingTasks(7).filter(t => t.date.slice(0, 10) !== today);
-      const upcomingText = upcomingTasks.length > 0
-        ? upcomingTasks.map(t => `- ${t.taskName} (${t.date}): ${t.description}`).join("\n")
-        : "ไม่มีงานใน 7 วันข้างหน้า";
+      const upcomingTasks = getUpcomingTasks(7).filter(
+        (t) => t.date.slice(0, 10) !== today,
+      );
+      const upcomingText =
+        upcomingTasks.length > 0
+          ? upcomingTasks
+              .map((t) => `- ${t.taskName} (${t.date}): ${t.description}`)
+              .join("\n")
+          : "ไม่มีงานใน 7 วันข้างหน้า";
 
-      return `[บริบทแปลงนาของผู้ใช้]\n` +
+      return (
+        `[บริบทแปลงนาของผู้ใช้]\n` +
         `พันธุ์: ${plan.varietyName}\n` +
-        `ลักษณะพันธุ์: ${plan.isPhotoperiodSensitive ? 'ไวต่อช่วงแสง' : 'ไม่ไวต่อช่วงแสง'}\n` +
+        `ลักษณะพันธุ์: ${plan.isPhotoperiodSensitive ? "ไวต่อช่วงแสง" : "ไม่ไวต่อช่วงแสง"}\n` +
         `วิธีปลูก: ${getPlantingMethodLabel(plan.plantingMethod)}\n` +
         `พื้นที่: ${plan.areaRai} ไร่\n` +
         `ประเภทดิน: ${plan.soilType}\n` +
@@ -146,7 +173,8 @@ export function FloatingChat() {
         `ผ่านมาแล้ว: ${das} วัน\n` +
         `ระยะปัจจุบัน: ${stage}\n` +
         `งานวันนี้:\n${todayText}\n` +
-        `งานใน 7 วันข้างหน้า:\n${upcomingText}`;
+        `งานใน 7 วันข้างหน้า:\n${upcomingText}`
+      );
     })();
 
     const question = inputMessage.trim();
@@ -171,30 +199,40 @@ export function FloatingChat() {
           content: m.sender === "user" ? (m.apiPayload ?? m.text) : m.text,
         }));
       const endpoint = noRagMode ? "/chat/no-rag" : "/chat/";
-      const data = await apiFetch<ChatResponse>(endpoint, {
-        method: "POST",
-        body: JSON.stringify({
-          question,
-          plan_context: planContext,
-          history,
-          collection: plan?.varietyId ?? null
-        }),
-      }, true);
+      const data = await apiFetch<ChatResponse>(
+        endpoint,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            question,
+            plan_context: planContext,
+            history,
+            collection: plan?.varietyId ?? null,
+          }),
+        },
+        true,
+      );
 
-      setMessages((prev) => [...prev, {
-        id: prev.length + 1,
-        text: data.answer,
-        sender: "bot" as const,
-        timestamp: new Date(),
-        sources: data.sources.length > 0 ? data.sources : undefined,
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: prev.length + 1,
+          text: data.answer,
+          sender: "bot" as const,
+          timestamp: new Date(),
+          sources: data.sources.length > 0 ? data.sources : undefined,
+        },
+      ]);
     } catch {
-      setMessages((prev) => [...prev, {
-        id: prev.length + 1,
-        text: "ขออภัยครับ เกิดข้อผิดพลาดในการเชื่อมต่อระบบ กรุณาลองใหม่อีกครั้ง",
-        sender: "bot" as const,
-        timestamp: new Date(),
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: prev.length + 1,
+          text: "ขออภัยครับ เกิดข้อผิดพลาดในการเชื่อมต่อระบบ กรุณาลองใหม่อีกครั้ง",
+          sender: "bot" as const,
+          timestamp: new Date(),
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -215,7 +253,11 @@ export function FloatingChat() {
           className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-12 h-12 sm:w-14 sm:h-14 bg-primary hover:bg-primary/90 text-white rounded-xl sm:rounded-2xl shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 z-50 ring-4 ring-white/50"
           aria-label="เปิดแชท"
         >
-          <MessageCircle size={22} className="sm:w-[26px] sm:h-[26px]" strokeWidth={2} />
+          <MessageCircle
+            size={22}
+            className="sm:w-[26px] sm:h-[26px]"
+            strokeWidth={2}
+          />
         </button>
       )}
 
@@ -228,11 +270,17 @@ export function FloatingChat() {
               onClick={handleHeaderTripleClick}
             >
               <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                {noRagMode ? <FlaskConical size={22} strokeWidth={2} /> : <Sprout size={22} strokeWidth={2} />}
+                {noRagMode ? (
+                  <FlaskConical size={22} strokeWidth={2} />
+                ) : (
+                  <Sprout size={22} strokeWidth={2} />
+                )}
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-base truncate">AI ผู้ช่วยวิชาการข้าว</h3>
+                  <h3 className="font-bold text-base truncate">
+                    AI ผู้ช่วยวิชาการข้าว
+                  </h3>
                   {noRagMode && (
                     <span className="text-[10px] font-semibold bg-amber-400/30 text-amber-100 border border-amber-300/40 px-1.5 py-0.5 rounded-full shrink-0">
                       No-RAG
@@ -240,7 +288,9 @@ export function FloatingChat() {
                   )}
                 </div>
                 <p className="text-xs text-white/80 truncate">
-                  {noRagMode ? "โหมดทดสอบ — ไม่ใช้เอกสารอ้างอิง" : "พร้อมให้คำปรึกษาจากคู่มือกรมการข้าว"}
+                  {noRagMode
+                    ? "โหมดทดสอบ — ไม่ใช้เอกสารอ้างอิง"
+                    : "พร้อมให้คำปรึกษาจากคู่มือกรมการข้าว"}
                 </p>
               </div>
             </div>
@@ -257,7 +307,9 @@ export function FloatingChat() {
           <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-slate-50 to-white space-y-5">
             {messages.map((msg) => (
               <div key={msg.id} className="flex flex-col gap-1.5">
-                <div className={`flex gap-2 ${msg.sender === "user" ? "flex-row-reverse" : "flex-row"}`}>
+                <div
+                  className={`flex gap-2 ${msg.sender === "user" ? "flex-row-reverse" : "flex-row"}`}
+                >
                   {msg.sender === "bot" && (
                     <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
                       <Sprout size={16} className="text-emerald-600" />
@@ -270,29 +322,40 @@ export function FloatingChat() {
                         : "bg-white text-gray-800 rounded-tl-md border border-slate-100"
                     }`}
                   >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                    <p className={`text-[11px] mt-2 ${msg.sender === "user" ? "text-emerald-100/90" : "text-slate-400"}`}>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {msg.text}
+                    </p>
+                    <p
+                      className={`text-[11px] mt-2 ${msg.sender === "user" ? "text-emerald-100/90" : "text-slate-400"}`}
+                    >
                       {formatTime(msg.timestamp)}
                     </p>
                   </div>
                 </div>
-                {msg.sender === "bot" && msg.sources && msg.sources.length > 0 && (
-                  <div className="ml-10 max-w-[82%]">
-                    <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm">
-                      <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2">
-                        แหล่งอ้างอิงเอกสาร
-                      </p>
-                      <ul className="space-y-1 list-none">
-                        {msg.sources.map((s, i) => (
-                          <li key={i} className="text-xs text-slate-700 flex gap-2 items-start">
-                            <span className="text-amber-500 shrink-0 mt-0.5">•</span>
-                            <span className="text-slate-500">{s}</span>
-                          </li>
-                        ))}
-                      </ul>
+                {msg.sender === "bot" &&
+                  msg.sources &&
+                  msg.sources.length > 0 && (
+                    <div className="ml-10 max-w-[82%]">
+                      <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm">
+                        <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2">
+                          แหล่งอ้างอิงเอกสาร
+                        </p>
+                        <ul className="space-y-1 list-none">
+                          {msg.sources.map((s, i) => (
+                            <li
+                              key={i}
+                              className="text-xs text-slate-700 flex gap-2 items-start"
+                            >
+                              <span className="text-amber-500 shrink-0 mt-0.5">
+                                •
+                              </span>
+                              <span className="text-slate-500">{s}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
             ))}
             {isLoading && (
@@ -302,9 +365,18 @@ export function FloatingChat() {
                 </div>
                 <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-md px-4 py-3 shadow-sm">
                   <div className="flex gap-1 items-center h-5">
-                    <span className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <span
+                      className="w-2 h-2 bg-slate-300 rounded-full animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    />
+                    <span
+                      className="w-2 h-2 bg-slate-300 rounded-full animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    />
+                    <span
+                      className="w-2 h-2 bg-slate-300 rounded-full animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    />
                   </div>
                 </div>
               </div>
@@ -335,7 +407,9 @@ export function FloatingChat() {
                 onChange={(e) => {
                   setInputMessage(e.target.value);
                   e.target.style.height = "auto";
-                  e.target.style.height = Math.min(e.target.scrollHeight, window.innerHeight * 0.4) + "px";
+                  e.target.style.height =
+                    Math.min(e.target.scrollHeight, window.innerHeight * 0.4) +
+                    "px";
                 }}
                 onKeyDown={handleKeyPress}
                 placeholder="พิมพ์คำถามเกี่ยวกับการปลูกข้าว... (Shift+Enter ขึ้นบรรทัดใหม่)"
@@ -362,7 +436,9 @@ export function FloatingChat() {
                 )}
               </button>
             </div>
-            <p className="text-[11px] text-slate-400 mt-2 text-center">Enter ส่ง • Shift+Enter ขึ้นบรรทัดใหม่</p>
+            <p className="text-[11px] text-slate-400 mt-2 text-center">
+              Enter ส่ง • Shift+Enter ขึ้นบรรทัดใหม่
+            </p>
           </div>
         </div>
       )}

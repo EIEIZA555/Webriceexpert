@@ -45,9 +45,9 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const token = getAuthToken();
 
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(options.headers ?? {}),
+    ...(options.headers as Record<string, string> | undefined),
   };
 
   if (requireAuth && token) {
@@ -84,4 +84,3 @@ export async function fetchDocsAndCollections(): Promise<{
   ]);
   return { documents, collections };
 }
-
