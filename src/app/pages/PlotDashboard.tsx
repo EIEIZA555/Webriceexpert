@@ -486,6 +486,11 @@ export default function PlotDashboard() {
                       <button
                         type="button"
                         onClick={() => toggleTask(activePlot.id, task.id)}
+                        aria-label={
+                          task.isCompleted
+                            ? `ทำเครื่องหมายว่ายังไม่เสร็จ: ${task.taskName}`
+                            : `ทำเครื่องหมายว่าเสร็จแล้ว: ${task.taskName}`
+                        }
                         className={`shrink-0 mt-0.5 ${task.isCompleted ? "text-emerald-500 hover:text-emerald-600" : "text-slate-300 hover:text-emerald-500"}`}
                       >
                         {task.isCompleted ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
@@ -533,6 +538,11 @@ export default function PlotDashboard() {
                     <button
                       type="button"
                       onClick={() => toggleTask(activePlot.id, task.id)}
+                      aria-label={
+                        task.isCompleted
+                          ? `ทำเครื่องหมายว่ายังไม่เสร็จ: ${task.taskName}`
+                          : `ทำเครื่องหมายว่าเสร็จแล้ว: ${task.taskName}`
+                      }
                       className={`shrink-0 mt-0.5 ${
                         task.isCompleted 
                           ? "text-emerald-500 hover:text-emerald-600" 
