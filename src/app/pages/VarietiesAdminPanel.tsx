@@ -22,7 +22,6 @@ interface Variety {
   collection_name: string;
   harvest_age_days: number;
   is_photoperiod_sensitive: boolean;
-  is_active: boolean;
   supported_methods: string[];
   description: string | null;
   reference_url: string | null;
@@ -304,16 +303,9 @@ export default function VarietiesAdminPanel({
                   <Sprout className="w-5 h-5 text-emerald-700" />
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-foreground truncate">
-                      {v.name}
-                    </p>
-                    {!v.is_active && (
-                      <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
-                        ปิดใช้งาน
-                      </span>
-                    )}
-                  </div>
+                  <p className="font-semibold text-foreground truncate">
+                    {v.name}
+                  </p>
                   <p className="text-xs text-muted-foreground font-mono">
                     {v.collection_name}
                   </p>
