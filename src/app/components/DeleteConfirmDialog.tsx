@@ -29,6 +29,7 @@ export function DeleteConfirmDialog({ title, description, onConfirm, onOpenChang
           variant="outline"
           size="sm"
           className={`rounded-lg text-destructive hover:text-destructive ${triggerClassName ?? ""}`}
+          onClick={(e) => e.stopPropagation()}
         >
           <Trash2 className="w-4 h-4" />
         </Button>

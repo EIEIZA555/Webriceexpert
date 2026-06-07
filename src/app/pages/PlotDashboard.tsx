@@ -5,8 +5,6 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import {
   Calendar,
-  Circle,
-  CheckCircle2,
   ArrowLeft,
   MapPin,
   Pencil,
@@ -15,10 +13,10 @@ import {
 } from "lucide-react";
 import { usePlans } from "../contexts/PlansContext";
 import { motion } from "motion/react";
-import { formatBE } from "../lib/dateUtils";
-import { th } from "date-fns/locale";
+import { formatDateShort, formatDateWithWeekday, todayAtMidnight, toISODate } from "../lib/dateUtils";
+import { EmptyState } from "../components/EmptyState";
 import { getPlantingMethodLabel } from "../lib/plantingMethod";
-import { TaskGlyph } from "../lib/taskIcons";
+import { TaskRow } from "../components/TaskRow";
 import LoadingScreen from "../components/LoadingScreen";
 import {
   Dialog,
@@ -75,13 +73,16 @@ export default function PlotDashboard() {
   if (!activePlot) {
     return (
       <div className="p-6 lg:p-10 max-w-4xl mx-auto">
-        <Card className="p-10 rounded-2xl border border-slate-200 bg-white text-center">
-          <p className="text-sm text-muted-foreground mb-4">ไม่พบแปลงที่เลือก</p>
-          <Button onClick={() => navigate("/app/plots")} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-11 px-6 shadow-sm">
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            ดูแปลงทั้งหมด
-          </Button>
-        </Card>
+        <EmptyState
+          message="ไม่พบแปลงที่เลือก"
+          action={
+            <Button onClick={() => navigate("/app/plots")} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-11 px-6 shadow-sm">
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              ดูแปลงทั้งหมด
+            </Button>
+          }
+          className="border border-slate-200 bg-white border-solid"
+        />
       </div>
     );
   }
@@ -90,9 +91,8 @@ export default function PlotDashboard() {
   const progressPercent = getProgressPercent();
   const currentStage = getCurrentStageName() ?? "เก็บเกี่ยวแล้ว";
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const today = todayAtMidnight();
+  const todayISO = toISODate(today);
   const todayTasks = activePlot.tasks.filter((t) => t.date === todayISO);
   const nextDate = todayTasks.length === 0
     ? activePlot.tasks
@@ -275,7 +275,7 @@ export default function PlotDashboard() {
                 open={cloneCalendarOpen}
                 onOpenChange={setCloneCalendarOpen}
                 disabled={(date) => {
-                  if (date < new Date(new Date().setHours(0, 0, 0, 0))) return true;
+                  if (date < todayAtMidnight()) return true;
                   if (activePlot.isPhotoperiodSensitive) {
                     const m = date.getMonth() + 1;
                     return m < 6 || m > 7;
@@ -342,8 +342,8 @@ export default function PlotDashboard() {
             </div>
             <p className="text-xl font-semibold text-foreground mb-2">{currentStage ?? "-"}</p>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              ผ่านมาแล้ว {daysSinceStart} วัน • เริ่มปลูก{" "}
-              {formatBE(new Date(activePlot.startDate), "d MMM yyyy", { locale: th })}
+              ผ่านมาแล้ว {daysSinceStart} วัน • เริ่มงาน{" "}
+              {formatDateShort(activePlot.startDate)}
             </p>
             <p className="text-sm text-muted-foreground mt-0.5">
               {activePlot.areaRai} ไร่
@@ -431,7 +431,7 @@ export default function PlotDashboard() {
               <div className="flex items-center gap-3">
                 <h3 className="text-base font-semibold text-foreground">รายการงาน</h3>
                 {taskView === "today" && (
-                  <p className="text-xs text-muted-foreground">{formatBE(today, "EEE d MMM yyyy", { locale: th })}</p>
+                  <p className="text-xs text-muted-foreground">{formatDateWithWeekday(today)}</p>
                 )}
                 {taskView === "all" && (
                   <Badge variant="secondary" className="w-fit bg-emerald-50 text-emerald-700 border-0 text-xs">
@@ -469,103 +469,37 @@ export default function PlotDashboard() {
             taskView === "today" && nextTasks.length > 0 ? (
               <div>
                 <p className="text-xs text-muted-foreground mb-2 px-1">
-                  ไม่มีงานวันนี้ — งานถัดไป {formatBE(new Date(`${nextDate}T00:00:00`), "EEE d MMM yyyy", { locale: th })}
+                  ไม่มีงานวันนี้ — งานถัดไป {nextDate ? formatDateWithWeekday(nextDate) : "-"}
                 </p>
                 <div className="space-y-2">
                   {nextTasks.map((task) => (
-                    <motion.div
+                    <TaskRow
                       key={task.id}
-                      layout
-                      className={`flex items-start gap-4 p-4 rounded-xl border transition-all ${
-                        task.isCompleted
-                          ? "bg-emerald-50/40 border-emerald-100/60 opacity-80"
-                          : "bg-white border-slate-200 shadow-sm hover:border-emerald-300"
-                      }`}
-                    >
-                      <TaskGlyph taskName={task.taskName} className="w-5 h-5 shrink-0 mt-1 text-emerald-700" aria-hidden />
-                      <button
-                        type="button"
-                        onClick={() => toggleTask(activePlot.id, task.id)}
-                        className={`shrink-0 mt-0.5 ${task.isCompleted ? "text-emerald-500 hover:text-emerald-600" : "text-slate-300 hover:text-emerald-500"}`}
-                      >
-                        {task.isCompleted ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-medium ${task.isCompleted ? "line-through text-slate-500" : "text-slate-900"}`}>
-                          {task.taskName}
-                        </p>
-                        <p className="text-sm mt-0.5 text-slate-500">{task.stage}</p>
-                        {task.description && (
-                          <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{task.description}</p>
-                        )}
-                      </div>
-                    </motion.div>
+                      task={task}
+                      onToggle={() => toggleTask(activePlot.id, task.id)}
+                    />
                   ))}
                 </div>
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm py-8 text-center bg-slate-50/50 rounded-xl border border-slate-100 border-dashed">
-                {taskView === "today" ? "ไม่มีงานที่กำหนดไว้และยังไม่มีงานถัดไป" : "ไม่มีงานในแผน"}
-              </p>
+              <EmptyState
+                message={
+                  taskView === "today"
+                    ? "ไม่มีงานที่กำหนดไว้และยังไม่มีงานถัดไป"
+                    : "ไม่มีงานในแผน"
+                }
+                className="border border-slate-100 bg-slate-50/50 border-solid py-8"
+              />
             )
           ) : (
             <div className={`space-y-2 ${taskView === "all" ? "max-h-[500px] overflow-y-auto pr-2 [scrollbar-gutter:stable] print:max-h-none print:overflow-visible print:pr-0" : ""}`}>
-              {(taskView === "today" ? todayTasks : activePlot.tasks).map((task) => {
-                const isOverdue = !task.isCompleted && new Date(`${task.date}T00:00:00`) < today;
-                
-                return (
-                  <motion.div
-                    key={task.id}
-                    layout
-                    className={`flex items-start gap-4 p-4 rounded-xl border transition-all ${
-                      task.isCompleted
-                        ? "bg-emerald-50/40 border-emerald-100/60 opacity-80"
-                        : isOverdue 
-                        ? "bg-rose-50/50 border-rose-200"
-                        : "bg-white border-slate-200 shadow-sm hover:border-emerald-300"
-                    }`}
-                  >
-                    <TaskGlyph
-                      taskName={task.taskName}
-                      className={`w-5 h-5 shrink-0 mt-1 ${isOverdue ? "text-rose-600" : "text-emerald-700"}`}
-                      aria-hidden
-                    />
-                    <button
-                      type="button"
-                      onClick={() => toggleTask(activePlot.id, task.id)}
-                      className={`shrink-0 mt-0.5 ${
-                        task.isCompleted 
-                          ? "text-emerald-500 hover:text-emerald-600" 
-                          : isOverdue
-                          ? "text-rose-400 hover:text-rose-600"
-                          : "text-slate-300 hover:text-emerald-500"
-                      }`}
-                    >
-                      {task.isCompleted ? (
-                        <CheckCircle2 className="w-6 h-6" />
-                      ) : (
-                        <Circle className="w-6 h-6" />
-                      )}
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className={`font-medium ${
-                          task.isCompleted ? "line-through text-slate-500" : "text-slate-900"
-                        }`}>
-                          {task.taskName}
-                        </p>
-                        {isOverdue && <Badge variant="outline" className="text-[10px] text-rose-600 border-rose-200 bg-white">เลยกำหนด</Badge>}
-                      </div>
-                      <p className={`text-sm mt-0.5 ${isOverdue ? "text-rose-600" : "text-slate-500"}`}>
-                        {formatBE(new Date(task.date), "EEE d MMM yyyy", { locale: th })} • {task.stage}
-                      </p>
-                      {task.description && (
-                        <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{task.description}</p>
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })}
+              {(taskView === "today" ? todayTasks : activePlot.tasks).map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  onToggle={() => toggleTask(activePlot.id, task.id)}
+                />
+              ))}
             </div>
           )}
         </Card>

@@ -3,7 +3,8 @@ import { useNavigate } from "react-router";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Leaf, UserPlus, Eye, EyeOff, Bot, CalendarDays, BarChart2, BookOpen, ArrowLeft } from "lucide-react";
+import { Leaf, UserPlus, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { AuthFeatureList } from "../components/AuthFeatureList";
 import { isAuthenticated, register } from "../lib/auth";
 
 export default function Register() {
@@ -54,24 +55,7 @@ export default function Register() {
         <div className="text-white">
           <h2 className="text-3xl font-semibold mb-2">ระบบผู้เชี่ยวชาญการปลูกข้าว</h2>
           <p className="text-white/70 text-sm mb-10">สมัครสมาชิกเพื่อใช้งานฟีเจอร์ครบถ้วน</p>
-          <div className="space-y-4">
-            {[
-              { icon: Bot, label: "ถาม-ตอบด้วย AI", desc: "ถามเรื่องโรค ปุ๋ย การดูแลข้าวได้ทันที" },
-              { icon: CalendarDays, label: "วางแผนการปลูก", desc: "สร้างแผนงานและปฏิทินดูแลแปลงนา" },
-              { icon: BarChart2, label: "ติดตามแปลงนา", desc: "ดูความคืบหน้าและงานที่ต้องทำ" },
-              { icon: BookOpen, label: "คลังความรู้", desc: "เอกสารวิชาการข้าวพร้อมอ้างอิง" },
-            ].map(({ icon: Icon, label, desc }) => (
-              <div key={label} className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
-                  <Icon className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-white">{label}</p>
-                  <p className="text-xs text-white/60">{desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <AuthFeatureList variant="dark" />
         </div>
 
         <div />

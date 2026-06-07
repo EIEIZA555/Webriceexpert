@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { CalendarDays } from "lucide-react";
 import { usePlans, type PlanTask } from "../contexts/PlansContext";
-import { DayPicker, type DayContentProps } from "react-day-picker";
+import type { DayContentProps } from "react-day-picker";
 import "react-day-picker/dist/style.css";
-import { format } from "date-fns";
 import { th } from "date-fns/locale";
-import { formatBE } from "../lib/dateUtils";
+import { Calendar as CalendarPicker } from "../components/ui/calendar";
+import { formatDateShort, formatDateWithWeekday, toISODate } from "../lib/dateUtils";
 import { addDaysToISODate } from "../lib/planGenerator";
 import LoadingScreen from "../components/LoadingScreen";
+import { EmptyState } from "../components/EmptyState";
 import {
   Select,
   SelectContent,
@@ -32,13 +33,12 @@ export default function Calendar() {
             เลือกหรือสร้างแผนการปลูกก่อน จากนั้นจะเห็นปฏิทินงานของแปลงนั้นที่นี่
           </p>
         </div>
-        <div className="flex flex-col items-center justify-center py-16 rounded-2xl border-2 border-dashed border-slate-200 bg-white">
-          <CalendarDays className="w-16 h-16 text-slate-400 mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-2">ยังไม่มีแผนที่เลือก</h3>
-          <p className="text-sm text-muted-foreground text-center max-w-sm">
-            ไปที่หน้า &quot;แปลงนา&quot; เพื่อสร้างและเลือกแผนการปลูก แล้วเปิดแปลงเพื่อดูรายละเอียด
-          </p>
-        </div>
+        <EmptyState
+          icon={CalendarDays}
+          title="ยังไม่มีแผนที่เลือก"
+          description='ไปที่หน้า "แปลงนา" เพื่อสร้างและเลือกแผนการปลูก แล้วเปิดแปลงเพื่อดูรายละเอียด'
+          className="bg-white"
+        />
       </div>
     );
   }
@@ -56,7 +56,7 @@ export default function Calendar() {
     return acc;
   }, [] as { name: string; startDay: number; endDay: number }[]);
 
-  const selectedKey = selectedDay != null ? format(selectedDay, "yyyy-MM-dd") : undefined;
+  const selectedKey = selectedDay != null ? toISODate(selectedDay) : undefined;
   const tasksForSelected: PlanTask[] = selectedKey ? (tasksByDate.get(selectedKey) ?? []) : [];
 
   return (
@@ -66,7 +66,7 @@ export default function Calendar() {
           <div>
             <h2 className="text-2xl font-semibold mb-1">ปฏิทิน</h2>
             <p className="text-muted-foreground text-sm">
-              งานและ milestone ของแปลงที่เลือกเท่านั้น
+              งานและระยะตามแผนของแปลงที่เลือก
             </p>
           </div>
           {plans.length > 1 && (
@@ -98,7 +98,7 @@ export default function Calendar() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-6 items-start mb-6">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:p-6 shadow-sm">
-          <DayPicker
+          <CalendarPicker
             mode="single"
             locale={th}
             selected={selectedDay}
@@ -109,7 +109,7 @@ export default function Calendar() {
             }}
             components={{
               DayContent: (props: DayContentProps) => {
-                const key = format(props.date, "yyyy-MM-dd");
+                const key = toISODate(props.date);
                 const hasTask = taskDateSet.has(key);
                 return (
                   <div className="flex flex-col items-center justify-center">
@@ -130,7 +130,7 @@ export default function Calendar() {
           <h3 className="text-sm font-semibold text-foreground mb-1">งานในวันที่เลือก</h3>
           <p className="text-xs text-muted-foreground mb-4">
             {selectedDay
-              ? formatBE(selectedDay, "EEE d MMM yyyy", { locale: th })
+              ? formatDateWithWeekday(selectedDay)
               : "ยังไม่ได้เลือกวันที่"}
           </p>
           {tasksForSelected.length === 0 ? (
@@ -153,7 +153,7 @@ export default function Calendar() {
 
       {stages.length > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:p-6 shadow-sm">
-          <h3 className="text-sm font-semibold text-foreground mb-3">ระยะการเจริญเติบโตตามแผน</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-3">งานในแต่ละระยะ</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
             {stages.map((s) => {
               const isCurrent = daysSinceStart >= s.startDay && daysSinceStart <= s.endDay;
@@ -166,8 +166,8 @@ export default function Calendar() {
                   className={`p-3 rounded-xl border ${isCurrent ? "bg-emerald-50 border-emerald-200" : "bg-slate-50/40 border-slate-200"}`}
                 >
                   <p className="text-xs text-muted-foreground">
-                    {formatBE(new Date(`${sStartISO}T00:00:00`), "d MMM yyyy", { locale: th })}
-                    {sStartISO !== sEndISO && ` – ${formatBE(new Date(`${sEndISO}T00:00:00`), "d MMM yyyy", { locale: th })}`}
+                    {formatDateShort(sStartISO)}
+                    {sStartISO !== sEndISO && ` – ${formatDateShort(sEndISO)}`}
                   </p>
                   <p className="text-sm font-semibold mt-1">{s.name}</p>
                   <p className="text-xs text-muted-foreground mt-2">
@@ -192,7 +192,7 @@ export default function Calendar() {
 function groupTasksByDate(tasks: PlanTask[]): Map<string, PlanTask[]> {
   const map = new Map<string, PlanTask[]>();
   for (const task of tasks) {
-    const normalizedKey = format(new Date(task.date), "yyyy-MM-dd");
+    const normalizedKey = task.date.slice(0, 10);
     const arr = map.get(normalizedKey) ?? [];
     arr.push(task);
     map.set(normalizedKey, arr);

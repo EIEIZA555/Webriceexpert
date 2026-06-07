@@ -1,43 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Leaf, Sprout, MessageCircle, BookOpen, FileText, ExternalLink, Bot, CalendarDays, BarChart2, SendHorizonal, UserPlus } from "lucide-react";
+import { Leaf, Sprout, MessageCircle, BookOpen, Bot, CalendarDays, BarChart2, UserPlus } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
-import { apiFetch, API_BASE_URL } from "../lib/api";
+import { apiFetch } from "../lib/api";
+import { useVarieties } from "../lib/useVarieties";
+import { ChatMessageList } from "../components/chat/ChatMessageList";
+import { ChatPromptChips } from "../components/chat/ChatPromptChips";
+import { ChatTextInput } from "../components/chat/ChatTextInput";
+import type { ChatMessage } from "../components/chat/types";
+import { buildChatHistory, sendChatMessage } from "../lib/chatApi";
+import { EmptyState } from "../components/EmptyState";
+import { DocumentCard } from "../components/DocumentCard";
 import { isAuthenticated } from "../lib/auth";
-
-interface Variety {
-  id: string;
-  name: string;
-  collection_name: string;
-  is_photoperiod_sensitive: boolean;
-  harvest_age_days: number;
-  supported_methods: string[];
-}
-
-interface ChatMessage {
-  id: number;
-  text: string;
-  sender: "user" | "bot";
-}
-
-interface ChatResponse {
-  answer: string;
-  sources: string[];
-}
-
-interface DocumentResponse {
-  id: string;
-  filename: string;
-  file_type: string;
-  created_at: string;
-}
-
-interface PromptTemplate {
-  id: string;
-  title: string;
-  content: string;
-}
+import type { DocumentResponse, PromptTemplate, RiceVariety } from "../lib/types";
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -48,7 +24,8 @@ export default function Landing() {
   const [isLoading, setIsLoading] = useState(false);
   const [documents, setDocuments] = useState<DocumentResponse[]>([]);
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
-  const [varieties, setVarieties] = useState<Variety[]>([]);
+  const { varieties: varietyRows } = useVarieties();
+  const varieties = varietyRows as RiceVariety[];
   const [activeTab, setActiveTab] = useState<"chat" | "docs">("chat");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -58,7 +35,6 @@ export default function Landing() {
     } else {
       apiFetch<DocumentResponse[]>("/documents/", {}, false).then(setDocuments).catch(() => {});
       apiFetch<PromptTemplate[]>("/prompts/", {}, false).then(setTemplates).catch(() => {});
-      apiFetch<Variety[]>("/varieties/", {}, false).then(setVarieties).catch(() => {});
     }
   }, []);
 
@@ -73,13 +49,8 @@ export default function Landing() {
     setInput("");
     setIsLoading(true);
     try {
-      const history = messages
-        .slice(-6)
-        .map((m) => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text }));
-      const data = await apiFetch<ChatResponse>("/chat/", {
-        method: "POST",
-        body: JSON.stringify({ question, history }),
-      }, false);
+      const history = buildChatHistory(messages);
+      const data = await sendChatMessage({ question, history, authenticated: false });
       setMessages((prev) => [...prev, { id: prev.length, text: data.answer, sender: "bot" }]);
     } catch {
       setMessages((prev) => [...prev, { id: prev.length, text: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง", sender: "bot" }]);
@@ -188,130 +159,45 @@ export default function Landing() {
       <div className="max-w-5xl mx-auto w-full px-4 py-4 flex-1">
         {activeTab === "chat" ? (
           <Card className="rounded-xl shadow-sm flex flex-col h-[520px]">
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((msg) => (
-                <div key={msg.id} className={`flex gap-2 ${msg.sender === "user" ? "flex-row-reverse" : "flex-row"}`}>
-                  {msg.sender === "bot" && (
-                    <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
-                      <Sprout size={16} className="text-primary" />
-                    </div>
-                  )}
-                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                    msg.sender === "user"
-                      ? "bg-primary text-white rounded-tr-md"
-                      : "bg-gray-100 text-gray-800 rounded-tl-md"
-                  }`}>
-                    {msg.text}
-                  </div>
-                </div>
-              ))}
-              {isLoading && (
-                <div className="flex gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                    <Sprout size={16} className="text-primary" />
-                  </div>
-                  <div className="bg-gray-100 rounded-2xl rounded-tl-md px-4 py-3">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+            <ChatMessageList
+              messages={messages}
+              isLoading={isLoading}
+              variant="landing"
+              messagesEndRef={messagesEndRef}
+            />
 
             {/* Prompt Templates */}
             {templates.length > 0 && messages.length <= 1 && (
-              <div className="px-4 pt-3 flex gap-2 flex-wrap border-t border-border">
-                {templates.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setInput(t.content)}
-                    className="text-xs px-3 py-1.5 rounded-full border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
-                  >
-                    {t.title}
-                  </button>
+              <ChatPromptChips templates={templates} onSelect={setInput} />
+            )}
+
+            <ChatTextInput
+              value={input}
+              onChange={setInput}
+              onSend={handleSend}
+              disabled={isLoading}
+              footer={
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  <button onClick={() => navigate("/login")} className="text-primary hover:underline">
+                    เข้าสู่ระบบ
+                  </button>{" "}
+                  เพื่อบันทึกประวัติการสนทนา วางแผนการปลูก และติดตามแปลงนา
+                </p>
+              }
+            />
+          </Card>
+        ) : (
+          <div>
+            {documents.length === 0 ? (
+              <EmptyState message="ยังไม่มีเอกสารในระบบ" />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {documents.map((doc) => (
+                  <DocumentCard key={doc.id} doc={doc} />
                 ))}
               </div>
             )}
-
-            {/* Input */}
-            <div className="p-4 border-t border-border">
-              <div className="flex gap-2 items-end">
-                <textarea
-                  value={input}
-                  onChange={(e) => {
-                    setInput(e.target.value);
-                    e.target.style.height = "auto";
-                    e.target.style.height = Math.min(e.target.scrollHeight, window.innerHeight * 0.4) + "px";
-                  }}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-                  placeholder="พิมพ์คำถามเกี่ยวกับการปลูกข้าว... (Shift+Enter ขึ้นบรรทัดใหม่)"
-                  disabled={isLoading}
-                  rows={1}
-                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 focus:bg-white transition-colors disabled:opacity-60 resize-none overflow-hidden leading-relaxed"
-                  style={{ minHeight: "44px", maxHeight: "40vh" }}
-                />
-                <button
-                  type="button"
-                  onClick={handleSend}
-                  disabled={!input.trim() || isLoading}
-                  className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-all duration-150 ${
-                    input.trim() && !isLoading
-                      ? "bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-md hover:shadow-lg active:scale-95"
-                      : "bg-slate-100 text-slate-400 cursor-not-allowed"
-                  }`}
-                  aria-label="ส่งข้อความ"
-                >
-                  {input.trim() ? (
-                    <SendHorizonal size={18} strokeWidth={2} />
-                  ) : (
-                    <MessageCircle size={18} strokeWidth={2} />
-                  )}
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                <button onClick={() => navigate("/login")} className="text-primary hover:underline">
-                  เข้าสู่ระบบ
-                </button>{" "}
-                เพื่อบันทึกประวัติการสนทนา วางแผนการปลูก และติดตามแปลงนา
-              </p>
-            </div>
-          </Card>
-        ) : (
-          <div>{documents.length === 0 ? (
-            <Card className="p-8 rounded-xl shadow-sm text-center text-muted-foreground text-sm">
-              ยังไม่มีเอกสารในระบบ
-            </Card>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {documents.map((doc) => (
-                <Card key={doc.id} className="p-4 rounded-xl shadow-sm flex flex-col gap-3 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <FileText className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate text-sm">{doc.filename}</p>
-                      <p className="text-xs text-muted-foreground">{doc.file_type.toUpperCase()} • {doc.created_at.slice(0, 10)}</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-lg w-full"
-                    onClick={() => window.open(`${API_BASE_URL}/documents/${doc.id}/file`, "_blank")}
-                  >
-                    <ExternalLink className="w-4 h-4 mr-1" />
-                    เปิดอ่าน
-                  </Button>
-                </Card>
-              ))}
-            </div>
-          )}</div>
+          </div>
         )}
       </div>
     </div>

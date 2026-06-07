@@ -8,6 +8,7 @@ import {
   Plus,
   Menu,
   BookOpen,
+  Settings,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState } from "react";
@@ -18,7 +19,7 @@ const navItems = [
   { path: "/app/plots", label: "แปลงนา", icon: Sprout, adminOnly: false },
   { path: "/app/calendar", label: "ปฏิทิน", icon: Calendar, adminOnly: false },
   { path: "/app/knowledge", label: "คลังความรู้", icon: BookOpen, adminOnly: false },
-  { path: "/app/admin", label: "จัดการระบบ", icon: BookOpen, adminOnly: true },
+  { path: "/app/admin", label: "จัดการระบบ", icon: Settings, adminOnly: true },
 ];
 
 export function AppLayout() {

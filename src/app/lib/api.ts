@@ -1,17 +1,8 @@
 export const API_BASE_URL = "http://localhost:8000";
 
-export interface DocumentResponse {
-  id: string;
-  filename: string;
-  file_type: string;
-  chroma_collection: string;
-  created_at: string;
-}
+import type { CollectionItem, DocumentResponse } from "./types";
 
-export interface CollectionItem {
-  value: string;
-  label: string;
-}
+export type { CollectionItem, DocumentResponse } from "./types";
 
 export function getAuthToken(): string | null {
   if (typeof window === "undefined") return null;

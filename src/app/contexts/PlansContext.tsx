@@ -2,6 +2,12 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import type { PlanTask, PlantingPlan, PlanResources, SoilTypeKey } from "../lib/planTypes";
 import { type PlantingMethodKey } from "../lib/plantingMethod";
 import { apiFetch, getAuthToken } from "../lib/api";
+import {
+  getCurrentStageNameFromTasks,
+  getDaysSinceStartFromTasks,
+  getProgressPercentFromTasks,
+  getTotalDaysFromTasks,
+} from "../lib/planProgress";
 
 export type { PlanTask, PlantingPlan, PlanResources } from "../lib/planTypes";
 export type { PlantingMethodKey } from "../lib/plantingMethod";
@@ -295,39 +301,19 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
 
   const plan = plans.find((p) => p.id === currentPlanId) ?? null;
 
-  const getDaysSinceStart = () => {
-    if (!plan || plan.tasks.length === 0) return 0;
-    // นับจาก task แรกสุด (อาจเป็นวันก่อนปลูก เช่น เตรียมกล้า)
-    const firstTaskDate = plan.tasks.reduce((min, t) =>
-      t.date < min ? t.date : min, plan.tasks[0].date
-    );
-    const start = new Date(`${firstTaskDate}T00:00:00`);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return Math.max(0, Math.floor((today.getTime() - start.getTime()) / 86400000));
-  };
+  const getDaysSinceStart = () =>
+    plan?.tasks.length ? getDaysSinceStartFromTasks(plan.tasks) : 0;
 
-  const getTotalDays = () => {
-    if (!plan || plan.tasks.length === 0) return 0;
-    const minDay = Math.min(...plan.tasks.map((t) => t.day));
-    const maxDay = Math.max(...plan.tasks.map((t) => t.day));
-    return maxDay - minDay;
-  };
+  const getTotalDays = () =>
+    plan?.tasks.length ? getTotalDaysFromTasks(plan.tasks) : 0;
 
-  const getProgressPercent = () => {
-    const total = getTotalDays();
-    if (!total) return 0;
-    return Math.min(100, Math.max(0, (getDaysSinceStart() / total) * 100));
-  };
+  const getProgressPercent = () =>
+    plan?.tasks.length ? getProgressPercentFromTasks(plan.tasks) : 0;
 
-  const getCurrentStageName = () => {
-    if (!plan || !plan.tasks.length) return null;
-    const das = getDaysSinceStart();
-    const minDay = Math.min(...plan.tasks.map(t => t.day));
-    const currentDay = das + minDay;
-    const sorted = [...plan.tasks].sort((a, b) => Math.abs(a.day - currentDay) - Math.abs(b.day - currentDay));
-    return sorted[0]?.stage ?? "เก็บเกี่ยวแล้ว";
-  };
+  const getCurrentStageName = () =>
+    plan?.tasks.length
+      ? getCurrentStageNameFromTasks(plan.tasks, getDaysSinceStartFromTasks(plan.tasks))
+      : null;
 
   const isVarietyRegisteredOnBackend = useCallback(
     (collectionName: string) => collectionToUUID.has(collectionName),
