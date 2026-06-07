@@ -7,7 +7,10 @@ test.describe("Rice Expert E2E smoke tests", () => {
     await page.goto("/");
 
     await expect(page.getByText("Rice Expert").first()).toBeVisible();
+
+    await page.getByRole("button", { name: /คลังความรู้/ }).click();
     await expect(page.getByText("rice-manual.pdf")).toBeVisible();
+    await page.getByRole("button", { name: /ถามผู้เชี่ยวชาญ AI/ }).click();
 
     const chatRequest = await expectApiRequest(page, "/chat/", async () => {
       await page
@@ -58,16 +61,17 @@ test.describe("Rice Expert E2E smoke tests", () => {
 
     await page.goto("/app/admin");
 
-    await expect(page.getByText("จัดการระบบ")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "จัดการระบบ" })).toBeVisible();
     await expect(page.getByText("farmer")).toBeVisible();
 
-    await page.getByRole("button", { name: "Prompt Templates" }).click();
+    await page.getByRole("button", { name: "จัดการคำถามแนะนำ" }).click();
     await expect(page.getByText("ปลูกข้าวยังไง")).toBeVisible();
     await expect(page.getByText("3")).toBeVisible();
 
     await page.getByRole("button", { name: "ช่องว่างความรู้" }).click();
-    await expect(page.getByText("โรคไหม้รักษายังไง")).toBeVisible();
-    await expect(page.getByText("2")).toBeVisible();
+    const gapRow = page.getByRole("row", { name: /โรคไหม้รักษายังไง/ });
+    await expect(gapRow).toBeVisible();
+    await expect(gapRow.getByText("2", { exact: true })).toBeVisible();
   });
 
   test("plots page renders plan cards and toggles a task from dashboard", async ({ page }) => {
@@ -78,6 +82,7 @@ test.describe("Rice Expert E2E smoke tests", () => {
     await page.getByText("แปลงทดสอบ").click();
 
     await expect(page).toHaveURL(/\/app\/plots\/plan-1/);
+    await page.getByRole("button", { name: "งานทั้งหมด" }).click();
     await expect(page.getByText("เตรียมดิน").first()).toBeVisible();
 
     const toggleRequest = await expectApiRequest(page, "/plans/plan-1/tasks/task-1/toggle", async () => {
@@ -102,8 +107,8 @@ test.describe("Rice Expert E2E smoke tests", () => {
 
     const payload = chatRequest.postDataJSON();
     expect(payload.question).toBe("วันนี้ควรทำอะไร");
-    expect(payload.collection).toBe("variety-1");
+    expect(payload.collection).toBe("jasmine105");
     expect(payload.plan_context).toContain("[บริบทแปลงนาของผู้ใช้]");
-    expect(payload.plan_context).toContain("แปลงทดสอบ");
+    expect(payload.plan_context).toContain("ข้าวหอมมะลิ 105");
   });
 });
