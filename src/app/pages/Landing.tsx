@@ -49,7 +49,7 @@ export default function Landing() {
     setInput("");
     setIsLoading(true);
     try {
-      const history = buildChatHistory(messages);
+      const history = buildChatHistory(messages, { skipWelcomeId: 0 });
       const data = await sendChatMessage({ question, history, authenticated: false });
       setMessages((prev) => [...prev, { id: prev.length, text: data.answer, sender: "bot" }]);
     } catch {

@@ -2,9 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "./api";
 import type { RiceVariety } from "./types";
 
-/** @deprecated ใช้ RiceVariety จาก lib/types แทน */
-export type VarietyItem = RiceVariety;
-
 export function useVarieties(requireAuth = false) {
   const [varieties, setVarieties] = useState<RiceVariety[]>([]);
   const [loading, setLoading] = useState(true);

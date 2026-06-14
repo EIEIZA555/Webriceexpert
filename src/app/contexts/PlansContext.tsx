@@ -67,7 +67,7 @@ function mapTask(t: BackendTask): PlanTask {
 function mapPlan(p: BackendPlan, uuidToCollection: Map<string, string>): PlantingPlan {
   return {
     id: p.id,
-    varietyId: uuidToCollection.get(p.variety_id) ?? p.variety_id,
+    collectionName: uuidToCollection.get(p.variety_id) ?? p.variety_id,
     varietyName: p.variety_name,
     startDate: p.start_date,
     actualPlantingDate: p.actual_planting_date,
@@ -97,7 +97,7 @@ interface PlansContextValue {
   currentPlanId: string | null;
   setCurrentPlanId: (id: string) => void;
   createPlan: (params: {
-    varietyId: string;
+    collectionName: string;
     startDate: string;
     plotName: string;
     landSize: string;
@@ -188,7 +188,7 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
 
   const createPlan = useCallback(
     async (params: {
-      varietyId: string;
+      collectionName: string;
       startDate: string;
       plotName: string;
       landSize: string;
@@ -197,8 +197,8 @@ export function PlansProvider({ children }: { children: React.ReactNode }) {
     }) => {
       // Fetch fresh varieties เพื่อหลีกเลี่ยง stale closure
       const { uuidMap, colMap } = await refreshVarieties();
-      const varietyUUID = colMap.get(params.varietyId);
-      if (!varietyUUID) throw new Error(`ไม่พบพันธุ์ข้าว: ${params.varietyId}`);
+      const varietyUUID = colMap.get(params.collectionName);
+      if (!varietyUUID) throw new Error(`ไม่พบพันธุ์ข้าว: ${params.collectionName}`);
 
       const backendPlan = await apiFetch<BackendPlan>(
         "/plans/",

@@ -74,7 +74,7 @@ export default function CreatePlan() {
     setError(null);
     try {
       await createPlan({
-        varietyId: formData.variety,
+        collectionName: formData.variety,
         startDate: formData.plantDate,
         plotName: formData.plotName,
         landSize: formData.landSize,
@@ -172,8 +172,8 @@ export default function CreatePlan() {
               displayVarieties={displayVarieties}
               totalVarieties={varieties.length}
               onVarietyQueryChange={setVarietyQuery}
-              onSelectVariety={(varietyId) =>
-                setFormData({ ...formData, variety: varietyId, plantingMethod: "" })
+              onSelectVariety={(collectionName) =>
+                setFormData({ ...formData, variety: collectionName, plantingMethod: "" })
               }
             />
           )}

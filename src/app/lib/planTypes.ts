@@ -23,7 +23,7 @@ export interface PlanResources {
 
 export interface PlantingPlan {
   id: string;
-  varietyId: string;
+  collectionName: string;
   varietyName: string;
   startDate: string;
   actualPlantingDate: string;

@@ -9,7 +9,7 @@ interface CreatePlanVarietyStepProps {
   displayVarieties: CreatePlanVarietyOption[];
   totalVarieties: number;
   onVarietyQueryChange: (query: string) => void;
-  onSelectVariety: (varietyId: string) => void;
+  onSelectVariety: (collectionName: string) => void;
 }
 
 export function CreatePlanVarietyStep({

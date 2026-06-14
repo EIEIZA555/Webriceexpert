@@ -3,20 +3,16 @@ import type { ChatMessage, ChatResponse } from "../components/chat/types";
 
 export function buildChatHistory(
   messages: ChatMessage[],
-  options?: { skipWelcomeId?: number; useApiPayload?: boolean },
+  options?: { skipWelcomeId?: number },
 ): Array<{ role: string; content: string }> {
   const skipId = options?.skipWelcomeId ?? -1;
-  const useApiPayload = options?.useApiPayload ?? false;
 
   return messages
     .filter((m) => m.id !== skipId)
-    .slice(-6)
+    .slice(-10)
     .map((m) => ({
       role: m.sender === "user" ? "user" : "assistant",
-      content:
-        m.sender === "user" && useApiPayload
-          ? (m.apiPayload ?? m.text)
-          : m.text,
+      content: m.text,
     }));
 }
 

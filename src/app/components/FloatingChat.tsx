@@ -30,16 +30,6 @@ interface HistoryItem {
   created_at: string;
 }
 
-/** ดึงเฉพาะคำถามที่ผู้ใช้พิมพ์จากข้อความที่เก็บใน DB (ตัด CONTEXT_PACK ออก) */
-function toDisplayUserQuestion(storedQuestion: string): string {
-  const marker = "คำถาม: ";
-  const idx = storedQuestion.lastIndexOf(marker);
-  if (idx !== -1) {
-    return storedQuestion.slice(idx + marker.length).trim();
-  }
-  return storedQuestion.trim();
-}
-
 export function FloatingChat() {
   const { plan, getDaysSinceStart, getCurrentStageName, getUpcomingTasks } =
     usePlans();
@@ -89,14 +79,11 @@ export function FloatingChat() {
         if (history.length === 0) return;
         const loaded: ChatMessage[] = [WELCOME_MESSAGE];
         history.forEach((h, i) => {
-          const displayQ = toDisplayUserQuestion(h.question);
-          const hasPack = h.question.includes("---CONTEXT_PACK");
           loaded.push({
             id: i * 2 + 1,
-            text: displayQ,
+            text: h.question,
             sender: "user",
             timestamp: new Date(h.created_at),
-            ...(hasPack ? { apiPayload: h.question } : {}),
           });
           loaded.push({
             id: i * 2 + 2,
@@ -135,16 +122,13 @@ export function FloatingChat() {
     setIsLoading(true);
 
     try {
-      const history = buildChatHistory(messages, {
-        skipWelcomeId: 0,
-        useApiPayload: true,
-      });
+      const history = buildChatHistory(messages, { skipWelcomeId: 0 });
       const data = await sendChatMessage({
         question,
         history,
         authenticated: true,
         planContext,
-        collection: plan?.varietyId ?? null,
+        collection: plan?.collectionName ?? null,
         noRag: noRagMode,
       });
 

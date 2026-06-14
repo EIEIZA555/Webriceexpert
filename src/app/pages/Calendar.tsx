@@ -109,6 +109,11 @@ export default function Calendar() {
             }}
             components={{
               DayContent: (props: DayContentProps) => {
+                const isOutsideMonth =
+                  props.date.getMonth() !== props.displayMonth.getMonth() ||
+                  props.date.getFullYear() !== props.displayMonth.getFullYear();
+                if (isOutsideMonth) return null;
+
                 const key = toISODate(props.date);
                 const hasTask = taskDateSet.has(key);
                 return (
