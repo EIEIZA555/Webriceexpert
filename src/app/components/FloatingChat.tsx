@@ -27,6 +27,7 @@ interface HistoryItem {
   id: string;
   question: string;
   answer: string;
+  sources?: string[];
   created_at: string;
 }
 
@@ -90,6 +91,7 @@ export function FloatingChat() {
             text: h.answer,
             sender: "bot",
             timestamp: new Date(h.created_at),
+            sources: h.sources && h.sources.length > 0 ? h.sources : undefined,
           });
         });
         setMessages(loaded);

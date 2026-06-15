@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MessageSquare, Plus, Sparkles } from "lucide-react";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
@@ -37,6 +37,7 @@ export default function AdminPromptsTab() {
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<number>>(new Set());
   const [suggestionsDialogOpen, setSuggestionsDialogOpen] = useState(false);
   const [savingGenerated, setSavingGenerated] = useState(false);
+  const generateDismissedRef = useRef(false);
 
   useEffect(() => {
     apiFetch<PromptTemplate[]>("/prompts/", {}, false)
@@ -75,19 +76,25 @@ export default function AdminPromptsTab() {
   const handleGenerateSuggestions = async () => {
     setGenerating(true);
     setError(null);
+    setGeneratedSuggestions([]);
+    setSelectedSuggestions(new Set());
+    generateDismissedRef.current = false;
+    setSuggestionsDialogOpen(true);
     try {
       const suggestions = await apiFetch<PromptSuggestion[]>(
         "/prompts/generate",
         { method: "POST" },
         true,
       );
+      if (generateDismissedRef.current) return;
       if (suggestions.length === 0) {
         throw new Error("AI ไม่ได้สร้างคำถามกลับมา กรุณาลองใหม่อีกครั้ง");
       }
       setGeneratedSuggestions(suggestions);
       setSelectedSuggestions(new Set(suggestions.map((_, index) => index)));
-      setSuggestionsDialogOpen(true);
     } catch (e) {
+      if (generateDismissedRef.current) return;
+      setSuggestionsDialogOpen(false);
       setError(getErrorMessage(e));
     } finally {
       setGenerating(false);
@@ -194,10 +201,23 @@ export default function AdminPromptsTab() {
       <Dialog
         open={suggestionsDialogOpen}
         onOpenChange={(open) => {
+          if (!open && generating) generateDismissedRef.current = true;
           if (!savingGenerated) setSuggestionsDialogOpen(open);
         }}
       >
         <DialogContent className="max-w-2xl">
+          {generating ? (
+            <div className="py-8">
+              <DialogHeader className="sr-only">
+                <DialogTitle>กำลังสร้างคำถามจาก AI</DialogTitle>
+              </DialogHeader>
+              <LoadingScreen />
+              <p className="text-center text-sm text-muted-foreground">
+                กำลังสร้างคำถามจาก AI...
+              </p>
+            </div>
+          ) : (
+            <>
           <DialogHeader>
             <DialogTitle>เลือกคำถามจาก AI ก่อนบันทึก</DialogTitle>
             <DialogDescription>
@@ -259,6 +279,8 @@ export default function AdminPromptsTab() {
                 : `บันทึก ${selectedSuggestions.size} คำถาม`}
             </Button>
           </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
